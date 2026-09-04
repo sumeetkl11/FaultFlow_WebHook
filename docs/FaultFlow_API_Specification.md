@@ -1,8 +1,8 @@
 **RESTFUL API SPECIFICATION (OPENAPI 3.1 COMPATIBLE)**
 
-EventPulse Engine: Production Ingestion, Telemetry Streaming & DLQ Control Plane
+FaultFlow Engine: Production Ingestion, Telemetry Streaming & DLQ Control Plane
 
-| **Base Ingress URL** | https://api.eventpulse.local/api/v1 |
+| **Base Ingress URL** | https://api.faultflow.local/api/v1 |
 | --- | --- |
 | **Authentication Standard** | API Key Header (X-API-Key) & Cryptographic Signature (X-Signature) |
 | **Data Format & Encoding** | application/json; charset=utf-8 |

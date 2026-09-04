@@ -1,6 +1,6 @@
 **FRONTEND IMPLEMENTATION CONTRACT**
 
-EventPulse UI: Real-Time Observability, DLQ Management & Chaos Control Sandbox
+FaultFlow UI: Real-Time Observability, DLQ Management & Chaos Control Sandbox
 
 | **Framework & Language** | Next.js 14+ (App Router) with TypeScript & React 18/19 |
 | --- | --- |

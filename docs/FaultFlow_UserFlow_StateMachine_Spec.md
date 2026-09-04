@@ -1,10 +1,10 @@
 **TECHNICAL SPECIFICATION & LIFECYCLE STATE MACHINE**
 
-EventPulse Engine: User Flow, Backend Job Lifecycle & Mermaid Diagrams
+FaultFlow Engine: User Flow, Backend Job Lifecycle & Mermaid Diagrams
 
 | **Document Type** | Systems Architecture Specification (Client & Backend Lifecycle) |
 | --- | --- |
-| **Target Platform** | EventPulse Engine (Distributed Webhook & Telemetry Gateway) |
+| **Target Platform** | FaultFlow Engine (Distributed Webhook & Telemetry Gateway) |
 | **Target Audience** | Senior Engineers, Systems Architects, and Technical Interviewers |
 | **Document Version** | v1.2.0-STABLE |
 
@@ -26,7 +26,7 @@ The complete journey describes how external callers, tenant applications, and UI
 
 **2. Backend Job Lifecycle & Execution States**
 
-Every event dispatched through EventPulse passes through a deterministic state machine managed between Redis (BullMQ in-memory cache) and durable PostgreSQL storage.
+Every event dispatched through FaultFlow passes through a deterministic state machine managed between Redis (BullMQ in-memory cache) and durable PostgreSQL storage.
 
 **1. RECEIVED:** API Gateway validates API key authentication, parses the body with Zod schema validation, and checks Redis SETNX for idempotency deduplication.
 

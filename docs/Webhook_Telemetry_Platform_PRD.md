@@ -1,6 +1,6 @@
 **PRODUCT REQUIREMENTS DOCUMENT (PRD)**
 
-System Specification: Resilient Multi-Tenant Webhook Orchestration & Telemetry Gateway (EventPulse Engine)
+System Specification: Resilient Multi-Tenant Webhook Orchestration & Telemetry Gateway (FaultFlow Engine)
 
 | **Document Version** | 1.0.0-PROD (Sprint Zero Baseline) |
 | --- | --- |
@@ -22,7 +22,7 @@ Modern web architectures and payment ecosystems (e.g., Stripe, Shopify, GitHub, 
 
 **System Objective:** Core Solution Value:
 
-This platform (EventPulse Engine) is an open-source, container-orchestrated, resilient multi-tenant webhook delivery and real-time observability gateway. It combines three mission-critical domains into one lightweight system: (1) An isolated Multi-Tenant API Ingress with cryptographic signature signing; (2) A fault-tolerant Redis-backed Task Queue supporting deterministic exponential backoff and Dead-Letter Queues (DLQ); and (3) An integrated streaming telemetry visualizer and local Chaos Testing Sandbox. It delivers enterprise-grade reliability with zero cloud runtime costs and complete tenant isolation.
+This platform (FaultFlow Engine) is an open-source, container-orchestrated, resilient multi-tenant webhook delivery and real-time observability gateway. It combines three mission-critical domains into one lightweight system: (1) An isolated Multi-Tenant API Ingress with cryptographic signature signing; (2) A fault-tolerant Redis-backed Task Queue supporting deterministic exponential backoff and Dead-Letter Queues (DLQ); and (3) An integrated streaming telemetry visualizer and local Chaos Testing Sandbox. It delivers enterprise-grade reliability with zero cloud runtime costs and complete tenant isolation.
 
 **2. User Personas & Access Roles**
 
