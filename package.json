@@ -1,0 +1,12 @@
+{
+  "name": "faultflow",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "test": "npm --prefix server test",
+    "migrate": "npm --prefix server run migrate",
+    "build": "npm --prefix server run build && npm --prefix client run build"
+  }
+}
