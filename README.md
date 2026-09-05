@@ -8,17 +8,17 @@
 
 ### 1. Operations Command Center (Main View)
 Features real-time telemetry KPI cards, live event stream with animated status pills, and interactive failure injection sandbox.
-![Dashboard Overview](C:/Users/sumee/.gemini/antigravity-ide/brain/308a9603-edd5-458b-b822-fa1a9c88e70e/dashboard_initial_1788600510650.png)
+![Dashboard Overview](docs/images/dashboard_overview.png)
 
 ### 2. Ingress Test Dispatcher Modal
 Allows instant dispatch of test webhooks directly into FaultFlow with customizable target endpoints, event types, retries, and payloads.
-![Dispatch Modal](C:/Users/sumee/.gemini/antigravity-ide/brain/308a9603-edd5-458b-b822-fa1a9c88e70e/dispatch_modal_1788600537581.png)
+![Dispatch Modal](docs/images/dispatch_modal.png)
 
 ### 3. Trace Inspector Drawer (Attempt Timeline & Payload Inspection)
 Slide-over drawer providing granular delivery attempt timelines, formatted JSON payload viewer, and HMAC-SHA256 header validation.
-![Trace Drawer Timeline](C:/Users/sumee/.gemini/antigravity-ide/brain/308a9603-edd5-458b-b822-fa1a9c88e70e/drawer_timeline_tab_1788600698376.png)
-![Trace Drawer Payload](C:/Users/sumee/.gemini/antigravity-ide/brain/308a9603-edd5-458b-b822-fa1a9c88e70e/drawer_payload_tab_1788600877338.png)
-![Trace Drawer Cryptographic Headers](C:/Users/sumee/.gemini/antigravity-ide/brain/308a9603-edd5-458b-b822-fa1a9c88e70e/drawer_headers_tab_1788600926973.png)
+![Trace Drawer Timeline](docs/images/drawer_timeline.png)
+![Trace Drawer Payload](docs/images/drawer_payload.png)
+![Trace Drawer Cryptographic Headers](docs/images/drawer_headers.png)
 
 ---
 
