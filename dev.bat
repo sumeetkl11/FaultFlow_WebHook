@@ -8,6 +8,14 @@ echo ===================================================
 echo   Starting FaultFlow Unified Development Stack
 echo ===================================================
 
+:: Release occupied ports 4000 and 3000 if lingering from previous runs
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":4000 "') do (
+    if not "%%a"=="" taskkill /f /pid %%a >nul 2>&1
+)
+for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000 "') do (
+    if not "%%a"=="" taskkill /f /pid %%a >nul 2>&1
+)
+
 :: Check Docker and start local infrastructure if available
 where docker >nul 2>nul
 if %errorlevel% equ 0 (

@@ -8,6 +8,20 @@ Write-Host "===================================================" -ForegroundColo
 Write-Host "  Starting FaultFlow Unified Development Stack" -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan
 
+# Clean up any lingering processes on ports 4000 and 3000
+$ports = @(4000, 3000)
+foreach ($port in $ports) {
+    $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    if ($connections) {
+        $pids = $connections | Select-Object -ExpandProperty OwningProcess -Unique
+        foreach ($p in $pids) {
+            if ($p -gt 0) {
+                Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
 # Check Docker and start local infrastructure if available
 if (Get-Command docker -ErrorAction SilentlyContinue) {
     Write-Host "[1/3] Checking Docker daemon status..." -ForegroundColor Yellow
