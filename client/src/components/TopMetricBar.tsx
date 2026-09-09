@@ -1,22 +1,50 @@
 'use client';
 
 import React from 'react';
+import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
-import {
-  Activity,
-  ShieldCheck,
-  CopyCheck,
-  AlertOctagon,
-  RotateCw,
-  Zap,
-  Lock,
-  CheckCircle,
-  Clock,
-  ArrowUpRight,
-} from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 
 interface TopMetricBarProps {
   onOpenDlqModal: () => void;
+}
+
+/** Animated number that smoothly tweens to its target value. */
+function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
+  const motionVal = useMotionValue(value);
+  const spring    = useSpring(motionVal, { stiffness: 200, damping: 30 });
+  const display   = useTransform(spring, (v) => v.toFixed(decimals));
+
+  React.useEffect(() => { motionVal.set(value); }, [value, motionVal]);
+
+  return <motion.span>{display}</motion.span>;
+}
+
+interface MetricProps {
+  label: string;
+  value: React.ReactNode;
+  unit?: string;
+  accent?: string;
+}
+
+function Metric({ label, value, unit, accent }: MetricProps) {
+  return (
+    <div className="flex items-center gap-2 px-4">
+      <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+        {label}
+      </span>
+      <span className={`text-xs font-semibold font-mono tabular-nums ${accent ?? 'text-zinc-100'}`}>
+        {value}
+      </span>
+      {unit && (
+        <span className="text-[11px] text-zinc-500 font-mono">{unit}</span>
+      )}
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="w-px h-4 bg-zinc-800 flex-shrink-0" />;
 }
 
 export const TopMetricBar: React.FC<TopMetricBarProps> = ({ onOpenDlqModal }) => {
@@ -29,162 +57,100 @@ export const TopMetricBar: React.FC<TopMetricBarProps> = ({ onOpenDlqModal }) =>
     dlqCount,
     activeQueue,
     audienceMode,
+    sseConnected,
   } = useTelemetryStore();
 
   const isBusiness = audienceMode === 'business';
 
-  const estimatedSavedRevenue = (rescuedPayloads * 25).toLocaleString('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  });
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
-      {/* Card 1: Ingress / Processed Events */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-800/80 shadow-lg relative overflow-hidden group hover:border-indigo-500/50 transition">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {isBusiness ? 'Processed Transactions' : 'Ingress Throughput'}
-          </span>
-          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:bg-indigo-500/20 transition">
-            {isBusiness ? <Zap className="w-4 h-4" /> : <Activity className="w-4 h-4" />}
-          </div>
-        </div>
-
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight text-white font-mono">
-            {isBusiness ? (throughputRps > 0 ? throughputRps * 60 : 248) : throughputRps}
-          </span>
-          <span className="text-xs text-slate-400 font-medium">
-            {isBusiness ? 'events / min' : 'req/s'}
-          </span>
-        </div>
-
-        <div className="mt-3 flex items-center gap-3 text-xs text-slate-400 border-t border-slate-800/60 pt-2.5">
-          {isBusiness ? (
-            <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
-              <CheckCircle className="w-3.5 h-3.5" />
-              <span>99.99% Guaranteed Delivery</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 font-mono text-[11px]">
-              <span>p50: <strong className="text-slate-200">{p50Ms}ms</strong></span>
-              <span>•</span>
-              <span>p95: <strong className="text-indigo-300">{p95Ms}ms</strong></span>
-              <span>•</span>
-              <span>Q: <strong className="text-slate-200">{activeQueue}</strong></span>
-            </div>
-          )}
-        </div>
+    <div className="h-8 bg-zinc-950 border-b border-zinc-800 flex items-center w-full overflow-x-auto">
+      {/* SSE Status dot */}
+      <div className="flex items-center gap-1.5 px-4 flex-shrink-0">
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+            sseConnected ? 'bg-emerald-400 sse-dot' : 'bg-rose-500'
+          }`}
+        />
+        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+          {sseConnected ? 'SSE' : 'DISC'}
+        </span>
       </div>
 
-      {/* Card 2: Rescued Payloads [Auto-Recovered Data] */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-800/80 shadow-lg relative overflow-hidden group hover:border-emerald-500/50 transition">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {isBusiness ? 'Rescued Transactions' : 'Rescued Payloads'}
-          </span>
-          <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 group-hover:bg-emerald-500/20 transition">
-            <ShieldCheck className="w-4 h-4" />
-          </div>
-        </div>
+      <Divider />
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight text-white font-mono">
-            {rescuedPayloads.toLocaleString()}
-          </span>
-          <span className="text-xs text-emerald-400 font-medium">
-            {isBusiness ? 'orders saved' : 'delivered'}
-          </span>
-        </div>
+      {/* Throughput */}
+      <Metric
+        label={isBusiness ? 'Processed' : 'Throughput'}
+        value={<AnimatedNumber value={isBusiness ? throughputRps * 60 : throughputRps} />}
+        unit={isBusiness ? 'evt/min' : 'req/s'}
+      />
 
-        <div className="mt-3 text-xs text-slate-400 border-t border-slate-800/60 pt-2.5 flex items-center justify-between">
-          <span>{isBusiness ? 'Saved Business Volume' : 'Protected Volume'}</span>
-          <strong className="text-emerald-400 font-mono font-semibold">{estimatedSavedRevenue}</strong>
-        </div>
-      </div>
+      <Divider />
 
-      {/* Card 3: Duplicate Requests Blocked [Prevented Double Action] */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-800/80 shadow-lg relative overflow-hidden group hover:border-cyan-500/50 transition">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {isBusiness ? 'Double Charges Blocked' : 'Deduplications'}
-          </span>
-          <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 group-hover:bg-cyan-500/20 transition">
-            <CopyCheck className="w-4 h-4" />
-          </div>
-        </div>
+      {/* Latency (engineering only) */}
+      {!isBusiness && (
+        <>
+          <Metric
+            label="p50"
+            value={<AnimatedNumber value={p50Ms} />}
+            unit="ms"
+          />
+          <Divider />
+          <Metric
+            label="p95"
+            value={<AnimatedNumber value={p95Ms} />}
+            unit="ms"
+            accent={p95Ms > 500 ? 'text-amber-400' : 'text-zinc-100'}
+          />
+          <Divider />
+        </>
+      )}
 
-        <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-3xl font-bold tracking-tight text-white font-mono">
-            {deduplications.toLocaleString()}
-          </span>
-          <span className="text-xs text-cyan-400 font-medium">
-            {isBusiness ? 'duplicates stopped' : 'SETNX filtered'}
-          </span>
-        </div>
+      {/* Active Queue */}
+      <Metric
+        label="Queue"
+        value={<AnimatedNumber value={activeQueue} />}
+        unit="active"
+        accent={activeQueue > 50 ? 'text-amber-400' : 'text-zinc-100'}
+      />
 
-        <div className="mt-3 text-xs text-slate-400 border-t border-slate-800/60 pt-2.5 flex items-center justify-between">
-          <span>{isBusiness ? 'Double Action Guard' : 'Double Execution Guard'}</span>
-          <span className="text-cyan-300 font-medium font-mono text-[11px]">
-            {isBusiness ? '100% Protected' : 'Atomic (24h TTL)'}
-          </span>
-        </div>
-      </div>
+      <Divider />
 
-      {/* Card 4: DLQ Safe Backlog */}
-      <div className="glass-card rounded-2xl p-5 border border-slate-800/80 shadow-lg relative overflow-hidden group hover:border-rose-500/50 transition">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {isBusiness ? 'Orders Needing Attention' : 'DLQ Safe Backlog'}
-          </span>
-          <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20 group-hover:bg-rose-500/20 transition">
-            <AlertOctagon className="w-4 h-4" />
-          </div>
-        </div>
+      {/* Rescued Payloads */}
+      <Metric
+        label={isBusiness ? 'Rescued' : 'Rescued'}
+        value={<AnimatedNumber value={rescuedPayloads} />}
+        unit={isBusiness ? 'orders' : 'payloads'}
+        accent="text-emerald-400"
+      />
 
-        <div className="mt-3 flex items-baseline justify-between gap-2">
-          <div className="flex items-baseline gap-2">
-            <span
-              className={`text-3xl font-bold tracking-tight font-mono ${
-                dlqCount > 0 ? 'text-rose-400' : 'text-slate-400'
-              }`}
-            >
-              {dlqCount.toLocaleString()}
-            </span>
-            <span className="text-xs text-slate-400 font-medium">
-              {isBusiness ? 'failed orders' : 'jobs exhausted'}
-            </span>
-          </div>
+      <Divider />
 
-          {dlqCount > 0 && (
-            <button
-              onClick={onOpenDlqModal}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-md shadow-rose-950/50 transition animate-pulse"
-            >
-              <RotateCw className="w-3 h-3" />
-              <span>{isBusiness ? 'Recover All' : 'Batch Replay'}</span>
-            </button>
-          )}
-        </div>
+      {/* Deduplications */}
+      <Metric
+        label="Dedup"
+        value={<AnimatedNumber value={deduplications} />}
+        accent="text-zinc-100"
+      />
 
-        <div className="mt-3 text-xs text-slate-400 border-t border-slate-800/60 pt-2.5 flex items-center justify-between">
-          <span>{isBusiness ? 'Safety Status' : 'Remediation Engine'}</span>
-          <span
-            className={`font-semibold ${
-              dlqCount > 0 ? 'text-rose-400' : 'text-emerald-400'
-            }`}
+      <Divider />
+
+      {/* DLQ — with interactive Replay trigger */}
+      <div className="flex items-center gap-2 px-4">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">DLQ</span>
+        <span className={`text-xs font-semibold font-mono tabular-nums ${dlqCount > 0 ? 'text-rose-400' : 'text-zinc-500'}`}>
+          <AnimatedNumber value={dlqCount} />
+        </span>
+        {dlqCount > 0 && (
+          <motion.button
+            onClick={onOpenDlqModal}
+            whileTap={{ scale: 0.97 }}
+            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-rose-950/60 border border-rose-800/60 text-rose-400 text-[10px] font-mono font-semibold hover:bg-rose-900/60 transition-colors"
           >
-            {dlqCount > 0
-              ? isBusiness
-                ? 'Action Recommended'
-                : 'Throttled (50 req/s)'
-              : isBusiness
-              ? 'All Clear'
-              : 'Zero Dead-Letters'}
-          </span>
-        </div>
+            <RotateCw className="w-2.5 h-2.5" />
+            Replay
+          </motion.button>
+        )}
       </div>
     </div>
   );

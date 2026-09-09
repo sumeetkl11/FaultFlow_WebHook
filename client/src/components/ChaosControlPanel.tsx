@@ -1,10 +1,61 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { ChaosConfig } from '../types';
 import { api } from '../lib/api';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
-import { Flame, Zap, ShieldAlert, Sliders, Play, Terminal, Server, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Play, Server, CheckCircle2, Zap, Terminal } from 'lucide-react';
+
+/* ── Inline toolbar button ─────────────────────────────────────────────── */
+function ToolbarButton({
+  id,
+  onClick,
+  disabled,
+  variant = 'default',
+  active = false,
+  children,
+  title,
+}: {
+  id?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  variant?: 'default' | 'danger' | 'success' | 'warning';
+  active?: boolean;
+  children: React.ReactNode;
+  title?: string;
+}) {
+  const baseClass =
+    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+
+  const variantClass = {
+    default: active
+      ? 'bg-zinc-700 border-zinc-600 text-zinc-100'
+      : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-600',
+    danger: active
+      ? 'bg-rose-950/80 border-rose-700 text-rose-300'
+      : 'bg-zinc-900 border-zinc-700 text-rose-400/70 hover:bg-rose-950/60 hover:border-rose-800 hover:text-rose-300',
+    success: active
+      ? 'bg-emerald-950/80 border-emerald-700 text-emerald-300'
+      : 'bg-zinc-900 border-zinc-700 text-emerald-400/70 hover:bg-emerald-950/60 hover:border-emerald-800 hover:text-emerald-300',
+    warning: active
+      ? 'bg-amber-950/80 border-amber-700 text-amber-300'
+      : 'bg-zinc-900 border-zinc-700 text-amber-400/70 hover:bg-amber-950/60 hover:border-amber-800 hover:text-amber-300',
+  }[variant];
+
+  return (
+    <motion.button
+      id={id}
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`${baseClass} ${variantClass}`}
+    >
+      {children}
+    </motion.button>
+  );
+}
 
 export const ChaosControlPanel: React.FC = () => {
   const [config, setConfig] = useState<ChaosConfig>({
@@ -12,18 +63,14 @@ export const ChaosControlPanel: React.FC = () => {
     artificial_delay_ms: 0,
     failure_rate_percent: 0,
   });
-  const [trafficBlastCount, setTrafficBlastCount] = useState<number>(25);
+  const [blastCount, setBlastCount] = useState<number>(25);
   const [isBlasting, setIsBlasting] = useState<boolean>(false);
   const { chaosLogs, addChaosLog, addToast, audienceMode } = useTelemetryStore();
   const isBusiness = audienceMode === 'business';
 
   useEffect(() => {
     api.getChaosConfig()
-      .then((res) => {
-        if (res?.data) {
-          setConfig(res.data);
-        }
-      })
+      .then((res) => { if (res?.data) setConfig(res.data); })
       .catch(() => {});
   }, []);
 
@@ -33,31 +80,30 @@ export const ChaosControlPanel: React.FC = () => {
     try {
       await api.updateChaosConfig(updated);
       const isDown = updated.simulated_status !== 200;
-      addChaosLog(`[CONFIG] Destination set to HTTP ${updated.simulated_status}, delay: ${updated.artificial_delay_ms}ms`);
+      addChaosLog(`[CONFIG] HTTP ${updated.simulated_status} · delay ${updated.artificial_delay_ms}ms`);
       addToast({
         type: isDown ? 'warning' : 'success',
-        title: isDown ? 'Destination Server Outage Simulated' : 'Destination Server Restored',
+        title: isDown ? `Destination → HTTP ${updated.simulated_status}` : 'Destination Restored (200 OK)',
         message: isDown
-          ? `Downstream server is now returning HTTP ${updated.simulated_status}. Incoming orders will trigger automatic shock absorption.`
-          : 'Downstream server is healthy (HTTP 200 OK). Orders will deliver directly.',
+          ? 'Incoming events will queue and retry automatically.'
+          : 'Downstream server healthy. Events will deliver directly.',
       });
     } catch (err: any) {
-      addChaosLog(`[ERROR] Failed to update chaos config: ${err.message}`);
+      addChaosLog(`[ERROR] Config update failed: ${err.message}`);
     }
   };
 
-  const handleFireBlast = async (count = trafficBlastCount) => {
+  const handleFireBlast = async (count = blastCount) => {
     setIsBlasting(true);
-    addChaosLog(`[BLAST] Initiating traffic burst of ${count} webhooks...`);
+    addChaosLog(`[BLAST] Firing ${count} webhooks…`);
     addToast({
       type: 'info',
-      title: isBusiness ? 'Simulating Sudden Spike' : 'Traffic Blast Enqueued',
-      message: `Firing ${count} test transactions simultaneously into ingress pipeline...`,
+      title: `Traffic Blast: ${count} events`,
+      message: 'Injecting into ingress pipeline.',
     });
 
     let sent = 0;
     const promises: Promise<any>[] = [];
-
     for (let i = 0; i < count; i++) {
       promises.push(
         api.ingestEvent({
@@ -66,10 +112,7 @@ export const ChaosControlPanel: React.FC = () => {
           payload: {
             blast_batch_id: `burst_${Date.now()}`,
             sequence: i + 1,
-            customer: {
-              email: `user_${i + 1}@store-demo.com`,
-              name: `Demo Customer ${i + 1}`,
-            },
+            customer: { email: `user_${i + 1}@store-demo.com`, name: `Demo Customer ${i + 1}` },
             amount: 2500 + i * 150,
             currency: 'USD',
             timestamp: new Date().toISOString(),
@@ -77,154 +120,114 @@ export const ChaosControlPanel: React.FC = () => {
           max_retries: 3,
           timeout_ms: 4000,
         })
-          .then(() => {
-            sent++;
-          })
-          .catch((err) => {
-            addChaosLog(`[WARN] Ingress dispatch dropped: ${err.message}`);
-          })
+          .then(() => { sent++; })
+          .catch((err) => { addChaosLog(`[WARN] Dropped: ${err.message}`); })
       );
     }
-
     await Promise.allSettled(promises);
     setIsBlasting(false);
-    addChaosLog(`[BLAST] Completed traffic burst: ${sent}/${count} events enqueued.`);
+    addChaosLog(`[BLAST] Completed: ${sent}/${count} enqueued.`);
   };
 
-  const isServerDown = config.simulated_status !== 200;
+  const isDown = config.simulated_status !== 200;
 
   return (
-    <div className="glass-card rounded-2xl border border-slate-800/80 shadow-xl overflow-hidden flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b border-slate-800/80 bg-slate-900/40 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`p-2 rounded-xl transition ${
-              isServerDown
-                ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-            }`}
-          >
-            <Flame className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-              Live Crash Test Sandbox
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-mono">
-                The "Show, Don't Tell" Panel
-              </span>
-            </h2>
-            <p className="text-[11px] text-slate-400">
-              Break the server. Watch it recover.
-            </p>
-          </div>
-        </div>
+    <div id="live-sandbox-panel" className="bg-zinc-900 border border-zinc-800 rounded-md overflow-hidden flex flex-col h-full">
 
-        {isServerDown && (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-950 text-rose-300 border border-rose-800 animate-pulse">
-            OUTAGE ACTIVE
+      {/* ── Panel header ──────────────────────────────────────────────── */}
+      <div className="h-9 px-3 border-b border-zinc-800 flex items-center justify-between flex-shrink-0">
+        <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+          <Server className="w-3.5 h-3.5" />
+          Chaos Sandbox
+        </span>
+        {isDown && (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950/70 border border-rose-800/60 text-rose-400 tabular-nums">
+            HTTP {config.simulated_status} ACTIVE
           </span>
         )}
       </div>
 
-      <div className="p-4 space-y-5 flex-1 overflow-y-auto">
-        {/* Onboarding hint box */}
-        <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
-          <div className="flex items-center gap-1.5 font-semibold text-indigo-300 mb-1">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Interactive Demo:</span>
-          </div>
-          {isBusiness
-            ? '1. Flip the switch below to "Server Down 500".\n2. Click "Send 25 Events". Watch FaultFlow catch each order, auto-retry with countdown, and preserve your data!'
-            : 'Simulate downstream receiver failures to inspect exponential backoff with randomized jitter and DLQ remediation.'}
+      {/* ── Inline primary action toolbar ─────────────────────────────── */}
+      <div className="px-3 py-2 border-b border-zinc-800/60 flex flex-wrap items-center gap-1.5 flex-shrink-0">
+        {/* Blast button */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          id="btn-simulate-traffic"
+          onClick={() => handleFireBlast(blastCount)}
+          disabled={isBlasting}
+          title="Fire burst of events into ingress pipeline"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-mono font-semibold border border-amber-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Play className={`w-3 h-3 fill-current ${isBlasting ? 'animate-pulse' : ''}`} />
+          {isBlasting ? 'Blasting…' : `Blast ${blastCount}`}
+        </motion.button>
+
+        {/* Blast count selector */}
+        <div className="flex items-center gap-1">
+          {[10, 25, 50].map((n) => (
+            <ToolbarButton
+              key={n}
+              onClick={() => setBlastCount(n)}
+              active={blastCount === n}
+              variant="warning"
+            >
+              {n}
+            </ToolbarButton>
+          ))}
         </div>
 
-        {/* 1. Destination Server Switch [Normal 200 OK vs Server Down 500] */}
+        {/* Server status toggles */}
+        <div className="w-px h-4 bg-zinc-700 mx-0.5" />
+
+        <ToolbarButton
+          onClick={() => handleUpdateConfig({ simulated_status: 200, failure_rate_percent: 0 })}
+          active={config.simulated_status === 200}
+          variant="success"
+          title="Restore destination server"
+        >
+          <CheckCircle2 className="w-3 h-3" />
+          200
+        </ToolbarButton>
+
+        <ToolbarButton
+          id="btn-crash-target-server"
+          onClick={() => handleUpdateConfig({ simulated_status: 500, failure_rate_percent: 100 })}
+          active={config.simulated_status === 500}
+          variant="danger"
+          title="Simulate 500 Internal Server Error"
+        >
+          500
+        </ToolbarButton>
+
+        <ToolbarButton
+          onClick={() => handleUpdateConfig({ simulated_status: 429, failure_rate_percent: 100 })}
+          active={config.simulated_status === 429}
+          variant="warning"
+          title="Simulate 429 Rate Limited"
+        >
+          429
+        </ToolbarButton>
+
+        <ToolbarButton
+          onClick={() => handleUpdateConfig({ simulated_status: 504, failure_rate_percent: 100 })}
+          active={config.simulated_status === 504}
+          variant="danger"
+          title="Simulate 504 Gateway Timeout"
+        >
+          504
+        </ToolbarButton>
+      </div>
+
+      {/* ── Body ─────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-4">
+
+        {/* Latency slider */}
         <div>
-          <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-1">
-            Target Server Health
-          </label>
-          <p className="text-[11px] text-slate-500 mb-2">Set the target server&apos;s response. 500 = crash, 429 = overloaded.</p>
-
-          {/* Primary Two-Way Switch */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              onClick={() =>
-                handleUpdateConfig({
-                  simulated_status: 200,
-                  failure_rate_percent: 0,
-                })
-              }
-              className={`py-2 px-3 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 ${
-                config.simulated_status === 200
-                  ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300 shadow-md shadow-emerald-950/50'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-900'
-              }`}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Normal (200 OK)</span>
-            </button>
-
-            <button
-              onClick={() =>
-                handleUpdateConfig({
-                  simulated_status: 500,
-                  failure_rate_percent: 100,
-                })
-              }
-              className={`py-2 px-3 rounded-xl text-xs font-semibold border transition flex items-center justify-center gap-2 ${
-                config.simulated_status === 500
-                  ? 'bg-rose-950/70 border-rose-500 text-rose-300 shadow-md shadow-rose-950/50'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-900'
-              }`}
-            >
-              <Server className="w-3.5 h-3.5 text-rose-400" />
-              <span>Server Down (500)</span>
-            </button>
-          </div>
-
-          {/* Additional status options */}
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            <button
-              onClick={() =>
-                handleUpdateConfig({
-                  simulated_status: 429,
-                  failure_rate_percent: 100,
-                })
-              }
-              className={`py-1.5 px-2.5 rounded-lg text-[11px] font-medium border transition text-center ${
-                config.simulated_status === 429
-                  ? 'bg-amber-950/60 border-amber-500 text-amber-300'
-                  : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:bg-slate-900'
-              }`}
-            >
-              429 Rate Limited
-            </button>
-            <button
-              onClick={() =>
-                handleUpdateConfig({
-                  simulated_status: 504,
-                  failure_rate_percent: 100,
-                })
-              }
-              className={`py-1.5 px-2.5 rounded-lg text-[11px] font-medium border transition text-center ${
-                config.simulated_status === 504
-                  ? 'bg-purple-950/60 border-purple-500 text-purple-300'
-                  : 'bg-slate-950/40 border-slate-800/80 text-slate-400 hover:bg-slate-900'
-              }`}
-            >
-              504 Gateway Timeout
-            </button>
-          </div>
-        </div>
-
-        {/* 2. Latency Slider */}
-        <div className="border-t border-slate-800/80 pt-4">
           <div className="flex justify-between items-center mb-1.5">
-            <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              Artificial Latency Injection
+            <label className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+              Artificial Latency
             </label>
-            <span className="text-xs font-mono text-indigo-300 font-bold">
+            <span className="text-[11px] font-mono tabular-nums text-zinc-300">
               {config.artificial_delay_ms}ms
             </span>
           </div>
@@ -235,73 +238,48 @@ export const ChaosControlPanel: React.FC = () => {
             step={250}
             value={config.artificial_delay_ms}
             onChange={(e) => handleUpdateConfig({ artificial_delay_ms: parseInt(e.target.value, 10) })}
-            className="w-full accent-indigo-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer"
+            className="w-full h-1.5 bg-zinc-800 rounded cursor-pointer accent-amber-500"
           />
-          <div className="flex justify-between text-[10px] text-slate-500 mt-1 font-mono">
-            <span>Instant (0ms)</span>
+          <div className="flex justify-between text-[10px] text-zinc-600 mt-1 font-mono">
+            <span>0ms</span>
             <span>1500ms</span>
-            <span>Slow (3000ms)</span>
+            <span>3000ms</span>
           </div>
         </div>
 
-        {/* 3. Blast Traffic Button [Send 25 events] */}
-        <div className="border-t border-slate-800/80 pt-4">
-          <div className="flex justify-between items-center mb-2">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                Simulate Traffic Burst
-              </label>
-              <p className="text-[11px] text-slate-500 mt-0.5">Blast webhooks and watch delivery, retry &amp; DLQ stats update live.</p>
-            </div>
-
-            {/* Quick count buttons */}
-            <div className="flex items-center gap-1">
-              {[10, 25, 50].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => setTrafficBlastCount(num)}
-                  className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold transition ${
-                    trafficBlastCount === num
-                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                      : 'bg-slate-900 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {num}
-                </button>
-              ))}
-            </div>
+        {/* Current config status row */}
+        <div className="flex items-center gap-2 p-2 rounded bg-zinc-950 border border-zinc-800">
+          <Zap className="w-3.5 h-3.5 text-zinc-500 flex-shrink-0" />
+          <div className="text-[11px] font-mono text-zinc-400 space-x-2">
+            <span>Status: <strong className={isDown ? 'text-rose-400' : 'text-emerald-400'}>HTTP {config.simulated_status}</strong></span>
+            <span>·</span>
+            <span>Delay: <strong className="text-zinc-200">{config.artificial_delay_ms}ms</strong></span>
+            <span>·</span>
+            <span>Fail: <strong className="text-zinc-200">{config.failure_rate_percent}%</strong></span>
           </div>
-
-          <button
-            onClick={() => handleFireBlast(trafficBlastCount)}
-            disabled={isBlasting}
-            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-950/50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            <Play className={`w-3.5 h-3.5 fill-current ${isBlasting ? 'animate-spin' : ''}`} />
-            {isBlasting ? 'SIMULATING TRAFFIC...' : `SIMULATE TRAFFIC (${trafficBlastCount} WEBHOOKS)`}
-          </button>
         </div>
 
-        {/* 4. Live Activity Feed */}
-        <div className="border-t border-slate-800/80 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Terminal className="w-3.5 h-3.5 text-slate-500" />
-              {isBusiness ? 'Live Simulation Feed' : 'Live Output Feed'}
+        {/* Live Output Feed */}
+        <div className="border-t border-zinc-800/60 pt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+              <Terminal className="w-3 h-3" />
+              {isBusiness ? 'Simulation Feed' : 'Output Feed'}
             </span>
-            <span className="text-[10px] text-indigo-400 font-mono flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-              Active
+            <span className="flex items-center gap-1 text-[10px] font-mono text-zinc-600">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-600 sse-dot" />
+              live
             </span>
           </div>
-          <div className="bg-slate-950 border border-slate-900 rounded-xl p-3 h-32 overflow-y-auto text-[11px] font-mono text-slate-400 space-y-1">
+          <div className="bg-zinc-950 border border-zinc-800 rounded p-2 h-40 overflow-y-auto space-y-0.5">
             {chaosLogs.length === 0 ? (
-              <div className="text-slate-600 italic">No events logged yet. Click "Send 25 Events" above.</div>
+              <div className="text-zinc-600 italic text-[11px] font-mono">
+                Awaiting activity…
+              </div>
             ) : (
               chaosLogs.map((log, idx) => (
-                <div key={idx} className="leading-tight text-slate-300">
-                  <span className="text-indigo-400">›</span> {log}
+                <div key={idx} className="text-[11px] font-mono text-zinc-400 leading-tight">
+                  <span className="text-zinc-600">›</span> {log}
                 </div>
               ))
             )}

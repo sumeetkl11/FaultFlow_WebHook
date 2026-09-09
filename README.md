@@ -1,20 +1,26 @@
 # FaultFlow: Resilient Multi-Tenant Webhook Orchestration & Telemetry Gateway
 
+[![Status: Functional Prototype](https://img.shields.io/badge/STATUS-FUNCTIONAL%20PROTOTYPE%20(v1.0)-amber?style=for-the-badge&logo=statuspage)](https://github.com/sumeetkl11/FaultFlow_WebHook)
+[![Architecture](https://img.shields.io/badge/Architecture-Dual--Audience%20v2.0-indigo?style=for-the-badge)](https://github.com/sumeetkl11/FaultFlow_WebHook)
+[![Delivery](https://img.shields.io/badge/Zero--Loss-Guaranteed-emerald?style=for-the-badge)](https://github.com/sumeetkl11/FaultFlow_WebHook)
+
+> **STATUS: FUNCTIONAL PROTOTYPE (v1.0)**
+>
 > A high-throughput, fault-tolerant webhook delivery broker and real-time observability platform. Features sub-25ms API ingress, atomic Redis `SETNX` idempotency, BullMQ worker clusters with cryptographic HMAC-SHA256 signing, exponential backoff with randomized jitter, Dead-Letter Queue (DLQ) remediation with 50 req/sec rate-throttling, Server-Sent Events (SSE) telemetry, and an interactive Chaos Testing Sandbox.
 
 ---
 
-## 🎯 The Pitch
+## 🎯 The Pitch (Recruiters & Reviewers)
 
-> **This is a fully functional prototype** that demonstrates how to eliminate transaction drops between modern e-commerce platforms (Shopify/Stripe) and third-party services. The goal was to deliver a working proof-of-concept for real-world load absorption — a background shock-absorber that queues, retries, and guarantees webhook delivery even when downstream servers crash.
+> *"Yeh ek fully functional prototype hai jo prove karta hai ki hum kaise modern e-commerce (Shopify/Stripe) aur third-party services ke beech transaction drops ko zero kar sakte hain. Hamara goal real-world load absorb karne ka proof-of-concept deliver karna tha, jise future mein team ke sath production-grade Shopify plugin ya reverse-proxy mein convert kiya ja sakta hai."*
 >
-> This can be converted into a production-grade **Shopify App Bridge plugin** or a **reverse-proxy SDK** with a team in a future phase.
+> *(English translation: "This is a fully functional prototype that proves how we can eliminate transaction drops between modern e-commerce (Shopify/Stripe) and third-party services. Our goal was to deliver a proof-of-concept for real-world load absorption, which can be converted into a production-grade Shopify plugin or reverse-proxy with a team in the future.")*
 
 | Layer | Status | What it proves |
 |-------|--------|----------------|
-| **Core Engine** | ✅ Shipped | Sub-25ms ingress, BullMQ workers, HMAC signing, idempotency, DLQ |
-| **Shopify App Bridge** | 🔜 Phase 2 | One-click install, OAuth flow, Admin API integration |
-| **Bank Webhook Proxy** | 🔜 Phase 3 | Direct payment processor proxy, TypeScript/Python SDKs |
+| **Core Engine (Phase 1)** | ✅ Shipped | Sub-25ms ingress, BullMQ workers, HMAC signing, idempotency, DLQ Engine |
+| **Shopify App Bridge (Phase 2)** | 🔜 Future Scope | One-click install, OAuth flow, Admin API integration |
+| **Bank Webhook Proxy & SDK (Phase 3)** | 🔜 Future Scope | Direct payment processor proxy, TypeScript/Python SDKs |
 
 ## 📸 Dashboard Overview & Screenshots
 

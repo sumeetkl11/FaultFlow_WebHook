@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
-import { RefreshCw, CheckCircle2, AlertTriangle, XCircle, Clock, PauseCircle, RotateCw, ShieldCheck } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface StatusBadgeProps {
   status: 'QUEUED' | 'PROCESSING' | 'RETRYING' | 'DELIVERED' | 'DEAD_LETTERED' | 'CIRCUIT_HOLD' | string;
@@ -42,55 +43,52 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   switch (status) {
     case 'QUEUED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-950/60 text-amber-300 border border-amber-800/60 animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          {isBusiness ? 'Queued Safely' : 'QUEUED'}
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-950/40 text-amber-400 border border-amber-800/50 transition-colors duration-300 ease-in-out">
+          <motion.span
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            className="w-1.5 h-1.5 rounded-full bg-amber-400"
+          />
+          {isBusiness ? 'Queued' : 'QUEUED'}
         </span>
       );
 
     case 'PROCESSING':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-950/60 text-blue-300 border border-blue-800/60">
-          <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
-          {isBusiness ? 'Sending to App...' : 'PROCESSING'}
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-zinc-800/80 text-zinc-300 border border-zinc-700/60 transition-colors duration-300 ease-in-out">
+          <motion.span
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 1.5 }}
+            className="w-1.5 h-1.5 rounded-full bg-zinc-300"
+          />
+          {isBusiness ? 'Sending…' : 'PROCESSING'}
         </span>
       );
 
     case 'RETRYING':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-950/80 text-indigo-300 border border-indigo-700/60">
-          <svg className="w-3.5 h-3.5 text-indigo-400 animate-spin" viewBox="0 0 24 24">
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-              fill="none"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v8H4z"
-            />
-          </svg>
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-950/40 text-amber-400 border border-amber-800/50 transition-colors duration-300 ease-in-out">
+          <motion.span
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+            className="w-1.5 h-1.5 rounded-full bg-amber-400"
+          />
           {isBusiness ? (
-            <span>Auto-Retrying in {secondsRemaining}s</span>
+            <span>Retry in {secondsRemaining}s</span>
           ) : (
-            <span>RETRYING ({attempts}/{maxRetries}) in {secondsRemaining}s</span>
+            <span>RETRY {attempts}/{maxRetries} ({secondsRemaining}s)</span>
           )}
         </span>
       );
 
     case 'DELIVERED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-950/70 text-emerald-300 border border-emerald-800/60">
-          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-          <span>{isBusiness ? 'Delivered Safely' : 'DELIVERED'}</span>
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-emerald-950/40 text-emerald-400 border border-emerald-800/50 transition-colors duration-300 ease-in-out">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span>{isBusiness ? 'Delivered' : 'DELIVERED'}</span>
           {!isBusiness && latencyMs != null && (
-            <span className="text-[10px] text-emerald-400/80 font-mono">
-              {latencyMs}ms
+            <span className="text-[10px] text-emerald-500 tabular-nums">
+              · {latencyMs}ms
             </span>
           )}
         </span>
@@ -98,37 +96,36 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
     case 'DEAD_LETTERED':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-950/80 text-rose-300 border border-rose-800/70">
-          <XCircle className="w-3 h-3 text-rose-400" />
-          <span>{isBusiness ? 'Action Needed' : 'DEAD-LETTERED'}</span>
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-rose-950/40 text-rose-400 border border-rose-800/50 transition-colors duration-300 ease-in-out">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+          <span>{isBusiness ? 'Action Needed' : 'DLQ'}</span>
           {onReplay && (
-            <button
+            <motion.button
+              whileTap={{ scale: 0.97 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onReplay();
               }}
-              className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 bg-rose-900/90 hover:bg-rose-800 text-white rounded text-[10px] font-semibold transition"
-              title="Safely resend this transaction"
+              className="ml-1 px-1 py-0.5 bg-rose-900/80 hover:bg-rose-800 text-rose-200 rounded text-[10px] font-mono border border-rose-700/60 transition-colors"
+              title="Replay transaction"
             >
               <RotateCw className="w-2.5 h-2.5" />
-              <span>{isBusiness ? 'Resend' : 'Replay'}</span>
-            </button>
+            </motion.button>
           )}
         </span>
       );
 
     case 'CIRCUIT_HOLD':
       return (
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-purple-950/70 text-purple-300 border border-purple-800/60">
-          <PauseCircle className="w-3 h-3 text-purple-400" />
-          {isBusiness ? 'Paused for Protection' : 'CIRCUIT HOLD (5m)'}
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-amber-950/40 text-amber-400 border border-amber-800/50 transition-colors duration-300 ease-in-out">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+          {isBusiness ? 'Paused' : 'CIRCUIT_HOLD'}
         </span>
       );
 
     default:
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-          <Clock className="w-3 h-3 text-slate-400" />
+        <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-zinc-900 text-zinc-400 border border-zinc-800 transition-colors duration-300 ease-in-out">
           {status}
         </span>
       );

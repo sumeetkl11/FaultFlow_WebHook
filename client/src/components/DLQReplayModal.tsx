@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DLQItem } from '../types';
 import { api } from '../lib/api';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
-import { X, RotateCw, AlertOctagon, CheckCircle2, ShieldAlert, CheckSquare, Square, Sparkles } from 'lucide-react';
+import { X, RotateCw, AlertOctagon, CheckCircle2, ShieldAlert, CheckSquare, Square } from 'lucide-react';
 
 interface DLQReplayModalProps {
   isOpen: boolean;
@@ -78,12 +79,10 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
       return;
     }
 
-    // Save snapshot for rollback if needed
     const prevEvents = [...events];
     const prevActive = activeQueue;
     const prevDlq = dlqCount;
 
-    // 1. Optimistic Status Update (Section 4.2 of Contract)
     optimisticReplay(targetIds);
 
     addToast({
@@ -102,29 +101,28 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
 
       const count = res.data?.replayed_count ?? targetIds.length;
       setReplayResult(
-        `Successfully scheduled ${count} jobs for replay (rate throttled <= ${res.data?.throttle_rate_per_sec || 50} req/s).`
+        `Scheduled ${count} jobs for replay (<= ${res.data?.throttle_rate_per_sec || 50} req/s).`
       );
 
       addChaosLog(`[DLQ REPLAY] Initiated replay of ${count} dead-lettered events`);
       addToast({
         type: 'success',
         title: isBusiness ? 'Orders Recovering' : 'DLQ Remediation Active',
-        message: `Dispatched ${count} events through token-bucket rate limiter.`,
+        message: `Dispatched ${count} events through rate limiter.`,
       });
 
       onReplaySuccess();
 
       setTimeout(() => {
         onClose();
-      }, 1400);
+      }, 1200);
     } catch (err: any) {
-      // Rollback on failure
       rollbackEvents(prevEvents, prevActive, prevDlq);
       setReplayResult(`Error: ${err.message}`);
       addToast({
         type: 'error',
         title: 'Replay Failed (Rolled Back)',
-        message: err.message || 'Network error encountered. Previous state restored.',
+        message: err.message || 'Previous state restored.',
       });
     } finally {
       setReplaying(false);
@@ -132,100 +130,97 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div
-        className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200"
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1, transition: { duration: 0.15 } }}
+        exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
+        className="w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-md shadow-2xl overflow-hidden font-mono"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <AlertOctagon className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-white tracking-tight">
-                {isBusiness ? 'Failed Orders Recovery (DLQ)' : 'Dead-Letter Queue (DLQ) Remediation'}
-              </h3>
-              <p className="text-xs text-slate-400">
-                {isBusiness
-                  ? 'Safely recover and re-deliver transactions that failed all previous attempts'
-                  : 'Throttled mass re-enqueueing with thundering herd prevention (50 req/s)'}
-              </p>
-            </div>
+        <div className="h-11 px-4 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4 text-rose-400" />
+            <span className="text-xs font-semibold text-zinc-100 uppercase tracking-wider">
+              {isBusiness ? 'Failed Orders Recovery (DLQ)' : 'DLQ Remediation'}
+            </span>
           </div>
-          <button
+          <motion.button
+            whileTap={{ scale: 0.97 }}
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
           >
-            <X className="w-5 h-5" />
-          </button>
+            <X className="w-3.5 h-3.5" />
+          </motion.button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
+        <div className="p-4 space-y-4 text-xs">
           {/* Rate Throttle Banner */}
-          <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-800/40 flex items-center justify-between text-xs text-indigo-300">
-            <span className="flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-indigo-400 flex-shrink-0" />
-              <span>{isBusiness ? 'Server Protection Safeguard:' : 'Token-Bucket Ingestion Ceiling:'}</span>
+          <div className="p-2 rounded bg-zinc-950 border border-zinc-800 flex items-center justify-between text-[11px] text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <ShieldAlert className="w-3.5 h-3.5 text-zinc-400 flex-shrink-0" />
+              <span>Token-Bucket Throttling:</span>
             </span>
-            <strong className="font-mono bg-indigo-900/60 px-2.5 py-0.5 rounded-lg border border-indigo-700/60 text-[11px]">
-              {isBusiness ? 'Smooth Delivery (50 req/s)' : '50 req/sec MAX'}
-            </strong>
+            <span className="font-mono text-zinc-200 tabular-nums">
+              50 req/sec MAX
+            </span>
           </div>
 
           {/* Mode Selector */}
           <div>
-            <label className="text-xs font-semibold text-slate-300 uppercase tracking-wider block mb-2">
-              {isBusiness ? 'Select Recovery Scope' : 'Replay Execution Mode'}
+            <label className="text-[11px] uppercase tracking-wider text-zinc-500 block mb-1.5">
+              Replay Execution Scope
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
+            <div className="grid grid-cols-2 gap-2">
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setMode('BATCH_ALL')}
-                className={`py-2.5 px-4 rounded-xl text-xs font-semibold border transition text-center ${
+                className={`py-1.5 px-3 rounded text-[11px] border transition-colors text-center ${
                   mode === 'BATCH_ALL'
-                    ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-950/50'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-850'
+                    ? 'bg-zinc-800 border-zinc-600 text-zinc-100 font-semibold'
+                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                 }`}
               >
-                {isBusiness ? `Recover All (${items.length} Orders)` : `Replay All (${items.length} Jobs)`}
-              </button>
-              <button
+                Replay All ({items.length})
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.98 }}
                 onClick={() => setMode('SELECTIVE')}
-                className={`py-2.5 px-4 rounded-xl text-xs font-semibold border transition text-center ${
+                className={`py-1.5 px-3 rounded text-[11px] border transition-colors text-center ${
                   mode === 'SELECTIVE'
-                    ? 'bg-indigo-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-950/50'
-                    : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-850'
+                    ? 'bg-zinc-800 border-zinc-600 text-zinc-100 font-semibold'
+                    : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
                 }`}
               >
-                {isBusiness ? `Selected Only (${selectedIds.length})` : `Selective Replay (${selectedIds.length})`}
-              </button>
+                Selective ({selectedIds.length})
+              </motion.button>
             </div>
           </div>
 
           {/* Items List */}
           <div>
-            <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-              <span>{isBusiness ? 'Failed Transactions' : 'Failed Jobs Backlog'}</span>
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 uppercase tracking-wider mb-1.5">
+              <span>DLQ Backlog</span>
               {mode === 'SELECTIVE' && items.length > 0 && (
                 <button
                   onClick={handleSelectAll}
-                  className="text-indigo-400 hover:text-indigo-300 text-[11px] lowercase flex items-center gap-1 font-sans"
+                  className="text-zinc-400 hover:text-zinc-200 text-[10px] transition-colors"
                 >
                   {selectedIds.length === items.length ? 'Deselect all' : 'Select all'}
                 </button>
               )}
             </div>
 
-            <div className="border border-slate-800 rounded-xl overflow-hidden max-h-56 overflow-y-auto bg-slate-950/80 divide-y divide-slate-850">
+            <div className="border border-zinc-800 rounded max-h-52 overflow-y-auto bg-zinc-950 divide-y divide-zinc-850">
               {loading ? (
-                <div className="p-6 text-center text-xs text-slate-500">
-                  Loading dead-letter backlog...
+                <div className="p-4 text-center text-zinc-600 text-[11px]">
+                  Loading dead-letter backlog…
                 </div>
               ) : items.length === 0 ? (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  Dead-Letter Queue is empty. All webhook deliveries are healthy!
+                <div className="p-4 text-center text-zinc-500 text-[11px]">
+                  Dead-Letter Queue is empty. All deliveries healthy.
                 </div>
               ) : (
                 items.map((item) => {
@@ -234,33 +229,30 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
                     <div
                       key={item.dlq_id}
                       onClick={() => mode === 'SELECTIVE' && handleToggleSelect(item.event_id)}
-                      className={`p-3 flex items-center justify-between text-xs transition ${
-                        mode === 'SELECTIVE' ? 'cursor-pointer hover:bg-slate-900/60' : ''
+                      className={`p-2.5 flex items-center justify-between text-[11px] transition-colors ${
+                        mode === 'SELECTIVE' ? 'cursor-pointer hover:bg-zinc-900' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
                         {mode === 'SELECTIVE' && (
-                          <div className="text-indigo-400">
-                            {isChecked ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4 text-slate-600" />}
+                          <div className="text-zinc-400 flex-shrink-0">
+                            {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-zinc-200" /> : <Square className="w-3.5 h-3.5 text-zinc-600" />}
                           </div>
                         )}
-                        <div>
-                          <div className="font-mono text-slate-200 font-semibold text-xs">
-                            {item.event_id.slice(0, 16)}...
+                        <div className="truncate">
+                          <div className="text-zinc-200 font-semibold tabular-nums">
+                            {item.event_id.slice(0, 14)}…
                           </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            {item.event_type} • Retried {item.retry_count} times
+                          <div className="text-zinc-500 text-[10px]">
+                            {item.event_type} · {item.retry_count} retries
                           </div>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-[10px] text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-900/60 font-mono">
-                          {item.error_message?.slice(0, 30) || 'Delivery Timeout'}
+                      <div className="text-right flex-shrink-0 ml-2">
+                        <span className="text-[10px] text-rose-400 bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-800/60 font-mono">
+                          {item.error_message?.slice(0, 24) || 'Timeout'}
                         </span>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          {new Date(item.dead_lettered_at).toLocaleTimeString()}
-                        </div>
                       </div>
                     </div>
                   );
@@ -271,45 +263,45 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
 
           {/* Feedback Result message */}
           {replayResult && (
-            <div className="p-3.5 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-xs text-emerald-300 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+            <div className="p-2 rounded bg-emerald-950/60 border border-emerald-800/80 text-[11px] text-emerald-300 flex items-center gap-2">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
               <span>{replayResult}</span>
             </div>
           )}
 
           {/* Modal Action Buttons */}
-          <div className="pt-2 flex justify-between items-center">
-            <span className="text-[11px] text-slate-400">
-              {isBusiness
-                ? 'Zero Double-Billing: Duplicate protection active'
-                : 'SETNX Idempotency active for all re-enqueued jobs'}
+          <div className="pt-2 border-t border-zinc-800 flex justify-between items-center">
+            <span className="text-[10px] text-zinc-500">
+              SETNX Idempotency Active
             </span>
 
-            <div className="flex gap-2.5">
-              <button
+            <div className="flex gap-2">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
+                className="px-3 py-1 rounded border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[11px] transition-colors"
               >
                 Cancel
-              </button>
-              <button
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 onClick={handleExecuteReplay}
                 disabled={replaying || items.length === 0 || (mode === 'SELECTIVE' && selectedIds.length === 0)}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-indigo-600 hover:from-rose-500 hover:to-indigo-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-rose-950/50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] flex items-center gap-1.5 border border-rose-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                <RotateCw className={`w-3.5 h-3.5 ${replaying ? 'animate-spin' : ''}`} />
+                <RotateCw className={`w-3 h-3 ${replaying ? 'animate-spin' : ''}`} />
                 <span>
                   {replaying
-                    ? 'Replaying with Rate Throttle...'
+                    ? 'Replaying…'
                     : isBusiness
-                    ? 'Confirm & Recover Orders'
-                    : 'Execute Throttled Replay'}
+                    ? 'Recover Orders'
+                    : 'Execute Replay'}
                 </span>
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

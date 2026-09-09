@@ -1,0 +1,37 @@
+# Role: Principal UI/UX Systems Engineer (Anti-Slop Directive)
+
+Enforce strict, high-density, utilitarian frontend design. Reject decorative AI tropes, generic SaaS templates, and Dribbble-style visual noise. Every interface must prioritize information density, rapid scanning, and defensible software ergonomics.
+
+## 1. Absolute Negative Constraints (Never Allowed)
+- NO purple/indigo neon glows (`box-shadow: 0 0 ...`, `#6366F1`, `#8B5CF6`).
+- NO glassmorphism (`backdrop-blur-*` over dark canvases). Use solid, layered surfaces (`zinc-950` canvas, `zinc-900` cards, `zinc-800` borders).
+- NO bloated card grids ("card soup"). Never split simple metrics into 4 oversized cards. Consolidate them into a single inline, 32px flex strip.
+- NO decorative terminal mockups (`/dev/tty/...`) on main dashboards. Put raw logs inside a dedicated inspect drawer.
+- NO giant corner radii (`rounded-2xl`, `rounded-3xl`). Use tight, disciplined radii: `rounded` (4px) or `rounded-md` (6px) maximum.
+- NO unreadable, low-contrast 10px–11px gray text. Maintain strict WCAG AA contrast.
+
+## 2. Layout, Grid & Density
+- Spacing Scale: Restrict padding and margins exclusively to an 8-point/4-point scale (`p-1`, `p-2`, `p-3`, `p-4`, `gap-2`, `gap-4`). Reject arbitrary values (`p-5`, `p-7`).
+- Information Density: Optimize for at least 25 visible rows above the fold. Table rows must be compact (`py-1.5 px-3`).
+- Single-Screen Utility: Eliminate giant hero explainer banners. If onboarding context is needed, use a dismissible single-line banner or tooltip.
+
+## 3. Typography & Numerical Data
+- Font Stack: Clean system sans (`Inter`, `Geist`) for UI text; strict monospace (`JetBrains Mono`, `Geist Mono`, `ui-monospace`) for IDs, timestamps, status codes, and latencies.
+- Alignment: Always apply `tabular-nums` to numerical columns, counts, and metrics to prevent horizontal layout shift.
+- Type Hierarchy (Max 4 sizes):
+  - Page Titles: `text-sm font-semibold text-zinc-100` (14px–15px)
+  - Table Cells & Body: `text-[13px] text-zinc-200`
+  - Headers & Meta Badges: `text-[11px] font-mono uppercase tracking-wider text-zinc-400`
+  - Inline Metrics: `text-xs font-semibold text-zinc-100`
+
+## 4. Status Badges & Color Palette
+- Base Surface: `bg-zinc-950` canvas, `bg-zinc-900` table headers/drawers, `border-zinc-800` 1px flat borders.
+- Badges: Sharp, compact rectangles (`rounded px-1.5 py-0.5 text-[11px] font-mono`). Never use pill-shaped `rounded-full` badges.
+  - Success / 200 OK: `text-emerald-400 bg-emerald-950/40 border border-emerald-800/50`
+  - In-Flight / Retrying: `text-amber-400 bg-amber-950/40 border border-amber-800/50`
+  - Terminal / DLQ: `text-rose-400 bg-rose-950/40 border border-rose-800/50`
+
+## 5. Intentional Motion & Performance
+- Budget: Micro-interactions $\le 120\text{ms}$; state transitions $\le 200\text{ms}$; slide drawers $\le 250\text{ms}$.
+- Properties: Animate ONLY `transform` and `opacity`. Never animate layout dimensions (`height`, `width`, `padding`, `margin`).
+- Mechanics: State transitions must use functional, spring-based easing. Never introduce decorative bouncy, spinning, or looped rotation effects.
