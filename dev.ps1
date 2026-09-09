@@ -1,5 +1,9 @@
+param(
+    [switch]$NoDocker = $false
+)
+
 # PowerShell startup script for FaultFlow
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
 # Navigate to script directory
 Set-Location -Path $PSScriptRoot
@@ -22,26 +26,29 @@ foreach ($port in $ports) {
     }
 }
 
-# Check Docker and start local infrastructure if available
-if (Get-Command docker -ErrorAction SilentlyContinue) {
+# Check Docker and start local infrastructure if requested
+if ($NoDocker) {
+    Write-Host "[1/3] Skipping Docker (-NoDocker specified). Using Cloud/Neon/Upstash env..." -ForegroundColor Yellow
+} elseif (Get-Command docker -ErrorAction SilentlyContinue) {
     Write-Host "[1/3] Checking Docker daemon status..." -ForegroundColor Yellow
     try {
         docker info | Out-Null
-        Write-Host "[1/3] Starting Docker services (PostgreSQL & Redis)..." -ForegroundColor Yellow
-        docker compose up -d 2>$null
-        if ($LASTEXITCODE -ne 0) {
-            docker-compose up -d 2>$null
-        }
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[1/3] Docker containers running successfully." -ForegroundColor Green
+            Write-Host "[1/3] Starting Docker services (PostgreSQL & Redis)..." -ForegroundColor Yellow
+            docker compose up -d
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "[1/3] Docker containers running successfully." -ForegroundColor Green
+            } else {
+                Write-Host "[1/3] Docker pull failed or timed out. Continuing with configured Cloud env (Neon & Upstash)..." -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "[1/3] Warning: Docker compose failed. Continuing with local/cloud env..." -ForegroundColor Yellow
+            Write-Host "[1/3] Docker daemon not running. Continuing with Cloud env..." -ForegroundColor Yellow
         }
     } catch {
-        Write-Host "[1/3] Docker daemon not running. Continuing with local/cloud env..." -ForegroundColor Yellow
+        Write-Host "[1/3] Docker daemon not running. Continuing with Cloud env..." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[1/3] Docker not found in PATH. Continuing with local/cloud env..." -ForegroundColor Yellow
+    Write-Host "[1/3] Docker not found in PATH. Continuing with Cloud env..." -ForegroundColor Yellow
 }
 
 # Ensure root dependencies

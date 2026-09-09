@@ -4,6 +4,18 @@
 
 ---
 
+## 🎯 The Pitch
+
+> **This is a fully functional prototype** that demonstrates how to eliminate transaction drops between modern e-commerce platforms (Shopify/Stripe) and third-party services. The goal was to deliver a working proof-of-concept for real-world load absorption — a background shock-absorber that queues, retries, and guarantees webhook delivery even when downstream servers crash.
+>
+> This can be converted into a production-grade **Shopify App Bridge plugin** or a **reverse-proxy SDK** with a team in a future phase.
+
+| Layer | Status | What it proves |
+|-------|--------|----------------|
+| **Core Engine** | ✅ Shipped | Sub-25ms ingress, BullMQ workers, HMAC signing, idempotency, DLQ |
+| **Shopify App Bridge** | 🔜 Phase 2 | One-click install, OAuth flow, Admin API integration |
+| **Bank Webhook Proxy** | 🔜 Phase 3 | Direct payment processor proxy, TypeScript/Python SDKs |
+
 ## 📸 Dashboard Overview & Screenshots
 
 ### 1. Operations Command Center (Main View)

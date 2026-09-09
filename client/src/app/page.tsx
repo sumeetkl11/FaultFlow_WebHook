@@ -12,15 +12,22 @@ import { ChaosControlPanel } from '../components/ChaosControlPanel';
 import { EventTraceDrawer } from '../components/EventTraceDrawer';
 import { DLQReplayModal } from '../components/DLQReplayModal';
 import { IngressDispatchModal } from '../components/IngressDispatchModal';
+import { ProductionRoadmapModal } from '../components/ProductionRoadmapModal';
+import { ExplainerBanner } from '../components/ExplainerBanner';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { ToastContainer } from '../components/ToastContainer';
 
 import {
   Zap,
   RotateCw,
   Send,
   Radio,
-  Layers,
+  Briefcase,
+  Code2,
   Database,
+  Map,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -30,9 +37,12 @@ export default function DashboardPage() {
   const {
     events: liveEvents,
     setEvents,
-    prependEvent,
     sseConnected,
     addChaosLog,
+    audienceMode,
+    setAudienceMode,
+    optimisticReplay,
+    addToast,
   } = useTelemetryStore();
 
   const [page, setPage] = useState<number>(1);
@@ -42,6 +52,7 @@ export default function DashboardPage() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [isDlqModalOpen, setIsDlqModalOpen] = useState<boolean>(false);
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false);
+  const [isRoadmapOpen, setIsRoadmapOpen] = useState<boolean>(false);
 
   // Fetch paginated events from REST endpoint
   const {
@@ -72,6 +83,7 @@ export default function DashboardPage() {
 
   const handleSingleReplay = async (eventId: string) => {
     try {
+      optimisticReplay([eventId]);
       addChaosLog(`[DLQ] Triggering single-event replay for ${eventId}...`);
       await api.replayDlq('SELECTIVE', [eventId]);
       addChaosLog(`[DLQ] Replay queued for ${eventId}`);
@@ -81,13 +93,16 @@ export default function DashboardPage() {
     }
   };
 
+  const isBusiness = audienceMode === 'business';
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#080c14] text-slate-100">
-      {/* 1. Header & Navigation Bar */}
-      <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-6 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+    <div className="min-h-screen flex flex-col bg-[#080c14] text-slate-100 selection:bg-indigo-500 selection:text-white">
+      {/* 1. RootLayout & Header Navigation */}
+      <header className="h-16 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between gap-4">
+        {/* Left: Platform Logo & Subtitle */}
+        <div className="flex items-center gap-4 sm:gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-lg shadow-indigo-500/20">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-cyan-500 p-0.5 shadow-lg shadow-indigo-500/20 flex-shrink-0">
               <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
                 <Zap className="w-5 h-5 text-indigo-400 fill-current" />
               </div>
@@ -97,39 +112,57 @@ export default function DashboardPage() {
                 <span className="font-bold text-base tracking-tight text-white font-sans">
                   FaultFlow
                 </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
-                  ENGINE v1.0
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">
+                  v2.0 DUAL-UI
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 -mt-0.5">
-                Multi-Tenant Webhook Broker & Telemetry Gateway
+              <p className="text-[11px] text-slate-400 -mt-0.5 hidden sm:block">
+                {isBusiness
+                  ? 'Zero-Loss Asynchronous Task & Webhook Shock-Absorber'
+                  : 'Multi-Tenant Webhook Broker & Real-Time Telemetry Gateway'}
               </p>
             </div>
           </div>
-
-          <nav className="hidden md:flex items-center gap-1 text-xs font-medium text-slate-400 border-l border-slate-800/80 pl-6">
-            <span className="px-3 py-1.5 rounded-lg bg-slate-800/60 text-white font-semibold">
-              Live Observability
-            </span>
-            <button
-              onClick={() => setIsDlqModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg hover:text-white hover:bg-slate-800/30 transition"
-            >
-              Dead-Letter Queue
-            </button>
-            <span className="px-3 py-1.5 rounded-lg hover:text-white transition cursor-default opacity-60">
-              API Keys
-            </span>
-          </nav>
         </div>
 
-        {/* Right Action Bar */}
-        <div className="flex items-center gap-3">
-          {/* Cluster & SSE Status Pills */}
-          <div className="hidden sm:flex items-center gap-2 text-xs">
+        {/* Center / Audience Mode Toggle [Simple Business Mode | Engineer Mode] */}
+        <div className="flex items-center p-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold shadow-inner">
+          <button
+            onClick={() => setAudienceMode('business')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
+              isBusiness
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-950/60'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Non-technical executive view with clear business terminology"
+          >
+            <Briefcase className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Simple Business Mode</span>
+            <span className="md:hidden">Business</span>
+          </button>
+
+          <button
+            onClick={() => setAudienceMode('engineering')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition ${
+              !isBusiness
+                ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white shadow-md shadow-cyan-950/60'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+            title="Deep engineering metrics, BullMQ queues, HMAC headers & raw latencies"
+          >
+            <Code2 className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Engineer Mode</span>
+            <span className="md:hidden">Engineer</span>
+          </button>
+        </div>
+
+        {/* Right Action Bar & Health Status Pill */}
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Engine Status Pill [HEALTHY | SSE ACTIVE] */}
+          <div className="hidden lg:flex items-center gap-2 text-xs">
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-800/50 text-emerald-300">
-              <Database className="w-3 h-3 text-emerald-400" />
-              <span>Postgres & Redis</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>HEALTHY</span>
             </div>
 
             <div
@@ -140,65 +173,84 @@ export default function DashboardPage() {
               }`}
             >
               <Radio className={`w-3 h-3 ${sseConnected ? 'text-indigo-400 animate-pulse' : 'text-rose-400'}`} />
-              <span>SSE: {sseConnected ? 'CONNECTED' : 'RECONNECTING'}</span>
+              <span>{sseConnected ? 'SSE ACTIVE' : 'RECONNECTING'}</span>
             </div>
           </div>
+
+          {/* Extensibility Roadmap Button */}
+          <button
+            onClick={() => setIsRoadmapOpen(true)}
+            className="px-3 py-1.5 rounded-xl border border-indigo-500/30 bg-indigo-950/40 hover:bg-indigo-900/40 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm"
+          >
+            <Map className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Roadmap</span>
+          </button>
 
           {/* DLQ Replay Trigger */}
           <button
             onClick={() => setIsDlqModalOpen(true)}
-            className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
+            className="px-3 py-1.5 rounded-xl border border-slate-800 bg-slate-900 hover:bg-slate-850 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition"
           >
             <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">DLQ Replay</span>
+            <span className="hidden sm:inline">{isBusiness ? 'Failed Orders' : 'DLQ Replay'}</span>
           </button>
 
-          {/* Dispatch Test Webhook Button */}
+          {/* Dispatch Webhook Button */}
           <button
             onClick={() => setIsDispatchModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-900/30 transition"
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow-md shadow-indigo-900/40 transition"
           >
             <Send className="w-3.5 h-3.5" />
-            <span>Send Webhook</span>
+            <span>{isBusiness ? 'Send Test Order' : 'Send Webhook'}</span>
           </button>
         </div>
       </header>
 
-      {/* 2. Main Content Viewport (1440px max) */}
+      {/* 2. Main Content Viewport */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-        {/* Top Real-Time Telemetry KPI Bar (4-Card Grid) */}
-        <TopMetricBar onOpenDlqModal={() => setIsDlqModalOpen(true)} />
+        {/* Interactive Storytelling Banner (Explainer Banner) */}
+        <ExplainerBanner />
+
+        {/* Top KPI Impact Bar (4-Col Grid) wrapped in ErrorBoundary */}
+        <ErrorBoundary componentName="TopMetricBar">
+          <TopMetricBar onOpenDlqModal={() => setIsDlqModalOpen(true)} />
+        </ErrorBoundary>
 
         {/* 3. Interactive Split-Screen Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Live Event Stream & Filters (65% width) */}
           <div className="lg:col-span-8 min-h-[580px]">
-            <EventStreamTable
-              events={displayedEvents}
-              totalCount={totalCount}
-              page={page}
-              pageSize={pageSize}
-              onPageChange={setPage}
-              onSelectEvent={setSelectedEventId}
-              onSingleReplay={handleSingleReplay}
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              searchQuery={searchQuery}
-              onSearchQueryChange={setSearchQuery}
-            />
+            <ErrorBoundary componentName="EventStreamTable">
+              <EventStreamTable
+                events={displayedEvents}
+                totalCount={totalCount}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onSelectEvent={setSelectedEventId}
+                onSingleReplay={handleSingleReplay}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Right Column: Chaos Sandbox & Failure Injector (35% width) */}
           <div className="lg:col-span-4 min-h-[580px]">
-            <ChaosControlPanel />
+            <ErrorBoundary componentName="ChaosControlPanel">
+              <ChaosControlPanel />
+            </ErrorBoundary>
           </div>
         </div>
       </main>
 
-      {/* 4. Sliding Trace Drawer (Overlay On-Demand) */}
+      {/* 4. Sliding Trace Drawer (On-Demand Inspection) */}
       <EventTraceDrawer
         eventId={selectedEventId}
         onClose={() => setSelectedEventId(null)}
+        onReplay={handleSingleReplay}
       />
 
       {/* 5. DLQ Batch Replay Modal */}
@@ -208,12 +260,21 @@ export default function DashboardPage() {
         onReplaySuccess={() => refetchEvents()}
       />
 
-      {/* 6. Ingress Webhook Test Dispatcher Modal */}
+      {/* 6. Ingress Webhook Test Dispatcher Modal (with Zod verification) */}
       <IngressDispatchModal
         isOpen={isDispatchModalOpen}
         onClose={() => setIsDispatchModalOpen(false)}
         onSuccess={() => refetchEvents()}
       />
+
+      {/* 7. Extensibility Roadmap Modal */}
+      <ProductionRoadmapModal
+        isOpen={isRoadmapOpen}
+        onClose={() => setIsRoadmapOpen(false)}
+      />
+
+      {/* 8. Toast Notification System */}
+      <ToastContainer />
     </div>
   );
 }

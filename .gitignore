@@ -52,5 +52,5 @@ skills-lock.json
 .cache/
 .turbo/
 tmp/
-temp/
-
+# TypeScript build info cache
+*.tsbuildinfo

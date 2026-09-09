@@ -22,9 +22,19 @@ redisClient.on('error', (err) => {
   logger.error({ err }, 'Redis error encountered');
 });
 
+let parsedRedisUrl: URL;
+try {
+  parsedRedisUrl = new URL(config.redisUrl);
+} catch {
+  parsedRedisUrl = new URL('redis://localhost:6379');
+}
+
 export const redisConnection = {
-  host: new URL(config.redisUrl).hostname || 'localhost',
-  port: parseInt(new URL(config.redisUrl).port || '6379', 10),
+  host: parsedRedisUrl.hostname || 'localhost',
+  port: parseInt(parsedRedisUrl.port || '6379', 10),
+  username: parsedRedisUrl.username || undefined,
+  password: parsedRedisUrl.password ? decodeURIComponent(parsedRedisUrl.password) : undefined,
+  tls: parsedRedisUrl.protocol === 'rediss:' ? { rejectUnauthorized: false } : undefined,
   maxRetriesPerRequest: null,
 };
 

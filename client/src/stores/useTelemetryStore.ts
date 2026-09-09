@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { EventItem, TelemetryMetrics } from '../types';
 
+export type AudienceMode = 'business' | 'engineering';
+
+export interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  message: string;
+}
+
 interface TelemetryState {
   // Real-time metric counters
   throughputRps: number;
@@ -14,22 +23,46 @@ interface TelemetryState {
   deduplications: number;
   sseConnected: boolean;
 
+  // Dual Audience Mode ('business' | 'engineering')
+  audienceMode: AudienceMode;
+  bannerCollapsed: boolean;
+
   // Sliding ring-buffer for live events (max 50)
   events: EventItem[];
 
   // Chaos logs feed
   chaosLogs: string[];
 
+  // Toast notifications
+  toasts: ToastMessage[];
+
   // Actions
+  setAudienceMode: (mode: AudienceMode) => void;
+  toggleBanner: () => void;
   setSseConnected: (connected: boolean) => void;
   updateTelemetry: (metrics: Partial<TelemetryMetrics>) => void;
   applyJobDelta: (delta: Partial<EventItem> & { event_id: string }) => void;
   setEvents: (events: EventItem[]) => void;
   prependEvent: (event: EventItem) => void;
   addChaosLog: (log: string) => void;
+  addToast: (toast: Omit<ToastMessage, 'id'>) => void;
+  removeToast: (id: string) => void;
+  optimisticReplay: (eventIds: string[]) => void;
+  rollbackEvents: (prevEvents: EventItem[], prevActiveQueue?: number, prevDlqCount?: number) => void;
 }
 
 const MAX_RING_BUFFER_SIZE = 50;
+
+// Helper to read initial audience mode from localStorage if available
+const getInitialAudienceMode = (): AudienceMode => {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('faultflow_audience_mode');
+    if (saved === 'engineering' || saved === 'business') {
+      return saved;
+    }
+  }
+  return 'business';
+};
 
 export const useTelemetryStore = create<TelemetryState>((set) => ({
   throughputRps: 0,
@@ -42,8 +75,21 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   rescuedPayloads: 0,
   deduplications: 0,
   sseConnected: false,
+
+  audienceMode: getInitialAudienceMode(),
+  bannerCollapsed: false,
   events: [],
   chaosLogs: [],
+  toasts: [],
+
+  setAudienceMode: (mode) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('faultflow_audience_mode', mode);
+    }
+    set({ audienceMode: mode });
+  },
+
+  toggleBanner: () => set((state) => ({ bannerCollapsed: !state.bannerCollapsed })),
 
   setSseConnected: (connected) => set({ sseConnected: connected }),
 
@@ -69,7 +115,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
           event_id: delta.event_id,
           target_url: delta.target_url || 'https://unknown',
           event_type: delta.event_type || 'unknown',
-          status: delta.status as any || 'QUEUED',
+          status: (delta.status as any) || 'QUEUED',
           attempts: delta.attempts || 0,
           latency_ms: delta.latency_ms ?? null,
           last_http_status: delta.last_http_status ?? null,
@@ -93,7 +139,6 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
 
   prependEvent: (event) =>
     set((state) => {
-      // Avoid duplicate by event_id
       const filtered = state.events.filter((e) => e.event_id !== event.event_id);
       return { events: [event, ...filtered.slice(0, MAX_RING_BUFFER_SIZE - 1)] };
     }),
@@ -101,5 +146,52 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   addChaosLog: (log) =>
     set((state) => ({
       chaosLogs: [log, ...state.chaosLogs.slice(0, 30)],
+    })),
+
+  addToast: (toast) => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    set((state) => ({
+      toasts: [...state.toasts, { ...toast, id }],
+    }));
+
+    // Auto-dismiss after 4.5 seconds
+    setTimeout(() => {
+      set((state) => ({
+        toasts: state.toasts.filter((t) => t.id !== id),
+      }));
+    }, 4500);
+  },
+
+  removeToast: (id) =>
+    set((state) => ({
+      toasts: state.toasts.filter((t) => t.id !== id),
+    })),
+
+  optimisticReplay: (eventIds) =>
+    set((state) => {
+      const count = eventIds.length;
+      const updatedEvents = state.events.map((e) => {
+        if (eventIds.includes(e.event_id)) {
+          return {
+            ...e,
+            status: 'QUEUED' as const,
+            next_retry_in_ms: undefined,
+          };
+        }
+        return e;
+      });
+
+      return {
+        events: updatedEvents,
+        activeQueue: state.activeQueue + count,
+        dlqCount: Math.max(0, state.dlqCount - count),
+      };
+    }),
+
+  rollbackEvents: (prevEvents, prevActiveQueue, prevDlqCount) =>
+    set((state) => ({
+      events: prevEvents,
+      activeQueue: prevActiveQueue !== undefined ? prevActiveQueue : state.activeQueue,
+      dlqCount: prevDlqCount !== undefined ? prevDlqCount : state.dlqCount,
     })),
 }));
