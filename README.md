@@ -152,6 +152,12 @@ Test 4: DLQ Replay Recovery
 All FaultFlow Integration Tests PASSED successfully!
 ```
 
+### Security & Static Code Analysis (SAST)
+Executes `npm audit`, `semgrep`, and `njsscan` in a single command before pushing:
+```bash
+npm run security:check
+```
+
 ---
 
 ## 📡 API Reference Summary
