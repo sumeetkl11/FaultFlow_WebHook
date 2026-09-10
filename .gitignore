@@ -54,3 +54,14 @@ skills-lock.json
 tmp/
 # TypeScript build info cache
 *.tsbuildinfo
+
+# Husky & Git Hooks
+.husky/
+
+# Batch scripts
+*.bat
+*.ps1
+*.sh
+*dev.ps1
+*dev.sh
+*dev.bat

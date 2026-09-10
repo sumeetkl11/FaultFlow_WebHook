@@ -1,0 +1,11 @@
+# Dependencies and build outputs
+node_modules/
+dist/
+.next/
+coverage/
+
+# Local utility scripts
+scripts/
+
+# Docs and media
+docs/

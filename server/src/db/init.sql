@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS events (
     payload_ref_id VARCHAR(64) REFERENCES event_blobs(id),
     inline_payload JSONB DEFAULT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
+    delivered_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
+    CONSTRAINT uq_events_tenant_idempotency UNIQUE (tenant_id, idempotency_key)
 );
 
 CREATE TABLE IF NOT EXISTS dead_letter_queue (

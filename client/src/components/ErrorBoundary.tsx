@@ -25,7 +25,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`ErrorBoundary caught in [${this.props.componentName || 'Component'}]:`, error, errorInfo);
+    console.error('ErrorBoundary caught in component:', this.props.componentName || 'Component', error, errorInfo);
   }
 
   private handleReset = () => {

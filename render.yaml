@@ -1,0 +1,42 @@
+services:
+  # FaultFlow Express Ingress API & Background Delivery Workers
+  - type: web
+    name: faultflow-server
+    env: node
+    rootDir: server
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /health/readiness
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: TRUSTED_PROXY_COUNT
+        value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: faultflow-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: faultflow-redis
+          property: connectionString
+      - key: DEFAULT_API_KEY
+        generateValue: true
+      - key: DEFAULT_SIGNING_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://faultflow.vercel.app"
+
+databases:
+  - name: faultflow-postgres
+    databaseName: faultflow_db
+    user: faultflow_admin
+    plan: standard
+
+  - name: faultflow-redis
+    ipAllowList: []
+    plan: standard
+    maxmemoryPolicy: volatile-lru

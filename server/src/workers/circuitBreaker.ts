@@ -1,15 +1,12 @@
+import { redisClient } from '../redis/index.js';
 import { logger } from '../utils/logger.js';
 
-interface HostFailureRecord {
-  failures: number[];
-  trippedUntil: number | null;
-}
+const FAILURE_WINDOW_MS = 30 * 1000; // 30 seconds sliding window
+const FAILURE_THRESHOLD = 10;        // 10 failures trips circuit
+const TRIP_DURATION_MS = 5 * 60 * 1000; // 5 minutes cooldown
 
-const hostFailureRegistry = new Map<string, HostFailureRecord>();
-
-const FAILURE_WINDOW_MS = 30 * 1000; // 30 seconds
-const FAILURE_THRESHOLD = 10;         // 10 consecutive failures
-const TRIP_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+// In-memory fallback if Redis is temporarily unreachable
+const fallbackFailureMap = new Map<string, { failures: number[]; trippedUntil: number | null }>();
 
 export const circuitBreaker = {
   /**
@@ -19,76 +16,110 @@ export const circuitBreaker = {
     try {
       return new URL(url).host;
     } catch {
-      return url;
+      return url.replace(/^https?:\/\//, '').split('/')[0] || url;
     }
   },
 
   /**
-   * Checks if deliveries to this host are currently tripped.
+   * Checks if deliveries to this host are currently tripped across the cluster.
    */
-  isTripped(url: string): boolean {
+  async isTripped(url: string): Promise<boolean> {
     const host = this.getHost(url);
-    const record = hostFailureRegistry.get(host);
-    if (!record) return false;
+    const tripKey = `cb:tripped:${host}`;
 
+    try {
+      const exists = await redisClient.exists(tripKey);
+      return exists === 1;
+    } catch (err: any) {
+      // Graceful fallback to local in-memory record
+      logger.warn({ host, err: err.message }, 'Redis circuit breaker check failed, using fallback');
+      const rec = fallbackFailureMap.get(host);
+      return Boolean(rec?.trippedUntil && rec.trippedUntil > Date.now());
+    }
+  },
+
+  /**
+   * Records a successful request, clearing failures and resetting the circuit breaker.
+   */
+  async recordSuccess(url: string): Promise<void> {
+    const host = this.getHost(url);
+    const tripKey = `cb:tripped:${host}`;
+    const failKey = `cb:failures:${host}`;
+
+    try {
+      await redisClient.del(tripKey, failKey);
+    } catch (err: any) {
+      logger.warn({ host, err: err.message }, 'Failed to clear circuit breaker in Redis');
+    }
+
+    fallbackFailureMap.delete(host);
+  },
+
+  /**
+   * Records a failure (5xx or timeout) in a Redis sliding window. Trips if threshold is exceeded.
+   */
+  async recordFailure(url: string): Promise<boolean> {
+    const host = this.getHost(url);
     const now = Date.now();
-    if (record.trippedUntil && record.trippedUntil > now) {
-      return true;
-    }
+    const tripKey = `cb:tripped:${host}`;
+    const failKey = `cb:failures:${host}`;
+    const windowStart = now - FAILURE_WINDOW_MS;
 
-    // If cooldown passed, reset
-    if (record.trippedUntil && record.trippedUntil <= now) {
-      record.trippedUntil = null;
-      record.failures = [];
-      logger.info(`Circuit breaker reset for host: ${host}`);
-    }
+    try {
+      const member = `${now}:${Math.random().toString(36).substring(2, 7)}`;
+      // Atomic pipeline: clean window, add failure, count failures, refresh TTL
+      const results = await redisClient
+        .multi()
+        .zremrangebyscore(failKey, 0, windowStart)
+        .zadd(failKey, now, member)
+        .zcard(failKey)
+        .expire(failKey, 60)
+        .exec();
 
-    return false;
+      const failureCount = (results?.[2]?.[1] as number) || 0;
+
+      if (failureCount >= FAILURE_THRESHOLD) {
+        await redisClient.set(tripKey, '1', 'PX', TRIP_DURATION_MS);
+        logger.warn(
+          `[CIRCUIT BREAKER] Tripped for host '${host}' (${failureCount} failures in ${FAILURE_WINDOW_MS / 1000}s). Pausing for ${TRIP_DURATION_MS / 60000} minutes.`
+        );
+        return true;
+      }
+
+      return false;
+    } catch (err: any) {
+      // Fallback in-memory tracking
+      logger.warn({ host, err: err.message }, 'Redis circuit breaker record failed, using fallback');
+      let rec = fallbackFailureMap.get(host);
+      if (!rec) {
+        rec = { failures: [], trippedUntil: null };
+        fallbackFailureMap.set(host, rec);
+      }
+      rec.failures = rec.failures.filter((t) => now - t <= FAILURE_WINDOW_MS);
+      rec.failures.push(now);
+
+      if (rec.failures.length >= FAILURE_THRESHOLD) {
+        rec.trippedUntil = now + TRIP_DURATION_MS;
+        return true;
+      }
+      return false;
+    }
   },
 
   /**
-   * Records a successful request, resetting the failure count.
+   * Returns cooldown time remaining in milliseconds if tripped.
    */
-  recordSuccess(url: string) {
+  async getRemainingCooldownMs(url: string): Promise<number> {
     const host = this.getHost(url);
-    hostFailureRegistry.delete(host);
-  },
+    const tripKey = `cb:tripped:${host}`;
 
-  /**
-   * Records a failure (5xx or timeout). Trips if threshold is exceeded.
-   */
-  recordFailure(url: string): boolean {
-    const host = this.getHost(url);
-    const now = Date.now();
-    let record = hostFailureRegistry.get(host);
-
-    if (!record) {
-      record = { failures: [], trippedUntil: null };
-      hostFailureRegistry.set(host, record);
+    try {
+      const pttl = await redisClient.pttl(tripKey);
+      return Math.max(0, pttl);
+    } catch {
+      const rec = fallbackFailureMap.get(host);
+      if (!rec || !rec.trippedUntil) return 0;
+      return Math.max(0, rec.trippedUntil - Date.now());
     }
-
-    // Filter out timestamps outside the sliding window
-    record.failures = record.failures.filter((t) => now - t <= FAILURE_WINDOW_MS);
-    record.failures.push(now);
-
-    if (record.failures.length >= FAILURE_THRESHOLD) {
-      record.trippedUntil = now + TRIP_DURATION_MS;
-      logger.warn(
-        `Circuit breaker TRIPPED for host '${host}' (${record.failures.length} failures in 30s). Pausing deliveries for 5 minutes.`
-      );
-      return true;
-    }
-
-    return false;
-  },
-
-  /**
-   * Returns cooldown time remaining in ms if tripped.
-   */
-  getRemainingCooldownMs(url: string): number {
-    const host = this.getHost(url);
-    const record = hostFailureRegistry.get(host);
-    if (!record || !record.trippedUntil) return 0;
-    return Math.max(0, record.trippedUntil - Date.now());
   },
 };

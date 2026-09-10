@@ -34,7 +34,7 @@ export const redisConnection = {
   port: parseInt(parsedRedisUrl.port || '6379', 10),
   username: parsedRedisUrl.username || undefined,
   password: parsedRedisUrl.password ? decodeURIComponent(parsedRedisUrl.password) : undefined,
-  tls: parsedRedisUrl.protocol === 'rediss:' ? { rejectUnauthorized: false } : undefined,
+  tls: parsedRedisUrl.protocol === 'rediss:' ? {} : undefined,
   maxRetriesPerRequest: null,
 };
 

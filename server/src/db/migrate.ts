@@ -50,6 +50,16 @@ export async function runMigrations() {
 
     await targetPool.query(initSql);
     await targetPool.query(`ALTER TABLE events ALTER COLUMN idempotency_key TYPE VARCHAR(128);`).catch(() => {});
+    await targetPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'uq_events_tenant_idempotency'
+        ) THEN
+          ALTER TABLE events ADD CONSTRAINT uq_events_tenant_idempotency UNIQUE (tenant_id, idempotency_key);
+        END IF;
+      END $$;
+    `).catch(() => {});
     logger.info('Database schema DDL executed successfully.');
 
     // Seed default tenant

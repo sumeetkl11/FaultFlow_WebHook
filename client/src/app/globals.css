@@ -105,3 +105,29 @@ body {
   transform-origin: top center;
   animation: line-grow 0.4s ease 0.1s both;
 }
+
+/* ── Precise Timeline Connector (eliminates visual offset & layout thrashing) ── */
+.timeline-track {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.timeline-track::before {
+  content: '';
+  position: absolute;
+  left: 0.4375rem;
+  top: 0.75rem;
+  bottom: 0.75rem;
+  width: 1px;
+  background-color: #27272a;
+}
+.timeline-node {
+  position: absolute;
+  left: -1.5rem;
+  top: 0.625rem;
+  width: 0.9375rem;
+  height: 0.9375rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

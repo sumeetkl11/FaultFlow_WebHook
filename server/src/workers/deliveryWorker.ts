@@ -7,6 +7,9 @@ import { telemetryBuffer } from '../telemetry/buffer.js';
 import { circuitBreaker } from './circuitBreaker.js';
 import { sseBroadcaster } from '../telemetry/sseBroadcaster.js';
 import { WebhookJobData } from '../queues/eventQueue.js';
+import { config } from '../config/env.js';
+import { validateWebhookUrl } from '../utils/urlValidator.js';
+import { generateWebhookSignature } from '../utils/signature.js';
 
 export function calculateBackoffWithJitter(attemptNumber: number): number {
   // Base intervals: Attempt 1: 5s, Attempt 2: 30s, Attempt 3: 120s (2m), Attempt 4: 900s (15m)
@@ -36,8 +39,8 @@ export const deliveryWorker = new Worker<WebhookJobData>(
     logger.info({ eventId, targetUrl, attemptNumber }, 'Worker processing webhook job');
 
     // Circuit Breaker check
-    if (circuitBreaker.isTripped(targetUrl)) {
-      const remainingCooldown = circuitBreaker.getRemainingCooldownMs(targetUrl);
+    if (await circuitBreaker.isTripped(targetUrl)) {
+      const remainingCooldown = await circuitBreaker.getRemainingCooldownMs(targetUrl);
       logger.warn({ targetUrl, remainingCooldown }, 'Circuit breaker is TRIPPED; delaying execution');
       await db.query(
         `UPDATE events SET status = 'CIRCUIT_HOLD' WHERE id = $1`,
@@ -61,13 +64,51 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       }
     }
 
-    // Cryptographic HMAC-SHA256 Signature
+    // SSRF URL & Hostname/IP Validation
+    try {
+      await validateWebhookUrl(targetUrl, {
+        allowLocal: config.allowLocalWebhooks,
+      });
+    } catch (ssrfErr: any) {
+      logger.error({ eventId, targetUrl, err: ssrfErr.message }, 'SSRF Validation blocked webhook delivery');
+      const latencyMs = 0;
+      await db.query(
+        `INSERT INTO event_attempts (event_id, attempt_number, http_status, latency_ms, error_message)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [eventId, attemptNumber, 400, latencyMs, ssrfErr.message]
+      ).catch(() => {});
+
+      const dlqId = `dlq_${eventId}_${Date.now()}`;
+      await db.query(
+        `INSERT INTO dead_letter_queue (id, event_id, tenant_id, error_message, last_response_body, retry_count)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [dlqId, eventId, tenantId, ssrfErr.message, 'BLOCKED_BY_SSRF_POLICY', attemptNumber]
+      ).catch(() => {});
+
+      await db.query(
+        `UPDATE events SET status = 'DEAD_LETTERED', last_http_status = 400, attempts = $1 WHERE id = $2`,
+        [attemptNumber, eventId]
+      ).catch(() => {});
+
+      sseBroadcaster.broadcast('job_state_delta', {
+        event_id: eventId,
+        status: 'DEAD_LETTERED',
+        attempts: attemptNumber,
+        last_http_status: 400,
+        error_message: ssrfErr.message,
+      }, tenantId);
+
+      return { delivered: false, status: 400, latencyMs, error: ssrfErr.message };
+    }
+
+    // Cryptographic HMAC-SHA256 Signature (Stripe / Svix Standard: v1,<sig>)
     const bodyString = JSON.stringify(resolvedPayload || {});
-    const timestamp = String(Date.now());
-    const signature = crypto
-      .createHmac('sha256', signingSecret || 'default_secret')
-      .update(`${timestamp}.${bodyString}`)
-      .digest('hex');
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const { headerValue: signatureHeader } = generateWebhookSignature(
+      bodyString,
+      timestamp,
+      signingSecret || config.defaultSigningSecret
+    );
 
     // AbortController timeout enforcement
     const controller = new AbortController();
@@ -94,7 +135,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
           'User-Agent': 'FaultFlow-Webhook-Engine/1.0',
           'X-FaultFlow-Event': job.data.eventType,
           'X-FaultFlow-Delivery': eventId,
-          'X-Signature': `sha256=${signature}`,
+          'X-Signature': signatureHeader,
           'X-Timestamp': timestamp,
         },
         body: bodyString,
@@ -122,7 +163,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
 
       if (response.ok) {
         // Success (2xx)
-        circuitBreaker.recordSuccess(targetUrl);
+        await circuitBreaker.recordSuccess(targetUrl);
         await db.query(
           `UPDATE events 
            SET status = 'DELIVERED', latency_ms = $1, last_http_status = $2, attempts = $3, delivered_at = NOW()
@@ -153,7 +194,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
         ? `ETIMEDOUT: Target did not respond within ${timeoutMs}ms`
         : err.message || 'Delivery network error';
 
-      circuitBreaker.recordFailure(targetUrl);
+      await circuitBreaker.recordFailure(targetUrl);
       telemetryBuffer.recordAttempt(latencyMs, responseStatus || 504);
 
       // Record failure attempt in event_attempts

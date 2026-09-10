@@ -9,15 +9,41 @@ interface TopMetricBarProps {
   onOpenDlqModal: () => void;
 }
 
-/** Animated number that smoothly tweens to its target value. */
+/** Animated number that smoothly tweens to its target value with cancelable RAF to prevent memory leaks. */
 function AnimatedNumber({ value, decimals = 0 }: { value: number; decimals?: number }) {
-  const motionVal = useMotionValue(value);
-  const spring    = useSpring(motionVal, { stiffness: 200, damping: 30 });
-  const display   = useTransform(spring, (v) => v.toFixed(decimals));
+  const [current, setCurrent] = React.useState(value);
+  const currentRef = React.useRef(value);
 
-  React.useEffect(() => { motionVal.set(value); }, [value, motionVal]);
+  React.useEffect(() => {
+    let animFrame: number;
+    const start = currentRef.current;
+    const target = value;
+    const startTime = performance.now();
+    const duration = 400; // 400ms smooth tween
 
-  return <motion.span>{display}</motion.span>;
+    function step(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      const val = start + (target - start) * ease;
+      currentRef.current = val;
+      setCurrent(val);
+
+      if (progress < 1) {
+        animFrame = requestAnimationFrame(step);
+      } else {
+        currentRef.current = target;
+        setCurrent(target);
+      }
+    }
+
+    animFrame = requestAnimationFrame(step);
+    return () => {
+      if (animFrame) cancelAnimationFrame(animFrame);
+    };
+  }, [value]);
+
+  return <span>{current.toFixed(decimals)}</span>;
 }
 
 interface MetricProps {

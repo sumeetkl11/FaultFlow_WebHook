@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { ChaosConfigSchema, ChaosConfigInput } from '../schemas/eventSchema.js';
 import { logger } from '../utils/logger.js';
+import { authenticateTenant } from '../middleware/auth.js';
 
 export const chaosRouter = Router();
 
@@ -28,8 +29,8 @@ interface ChaosLogEntry {
 const recentChaosLogs: ChaosLogEntry[] = [];
 const MAX_CHAOS_LOGS = 50;
 
-// POST /api/v1/chaos/config - Update sandbox failure parameters
-chaosRouter.post('/config', (req: Request, res: Response) => {
+// POST /api/v1/chaos/config - Update sandbox failure parameters (Authenticated)
+chaosRouter.post('/config', authenticateTenant, (req: Request, res: Response) => {
   const parsed = ChaosConfigSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -62,8 +63,8 @@ chaosRouter.post('/config', (req: Request, res: Response) => {
   });
 });
 
-// GET /api/v1/chaos/config - Get current sandbox parameters
-chaosRouter.get('/config', (req: Request, res: Response) => {
+// GET /api/v1/chaos/config - Get current sandbox parameters (Authenticated)
+chaosRouter.get('/config', authenticateTenant, (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     status: 200,
@@ -76,8 +77,8 @@ chaosRouter.get('/config', (req: Request, res: Response) => {
   });
 });
 
-// GET /api/v1/chaos/logs - Get recent chaos sink received deliveries
-chaosRouter.get('/logs', (req: Request, res: Response) => {
+// GET /api/v1/chaos/logs - Get recent chaos sink received deliveries (Authenticated)
+chaosRouter.get('/logs', authenticateTenant, (req: Request, res: Response) => {
   return res.status(200).json({
     success: true,
     status: 200,

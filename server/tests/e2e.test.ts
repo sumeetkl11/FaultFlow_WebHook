@@ -60,7 +60,7 @@ async function runTests() {
   // Configure chaos to 100% 500
   await fetch(`${API_BASE}/chaos/config`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
     body: JSON.stringify({
       simulated_status: 500,
       artificial_delay_ms: 50,
@@ -102,7 +102,7 @@ async function runTests() {
   // Reset chaos to 200
   await fetch(`${API_BASE}/chaos/config`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
     body: JSON.stringify({
       simulated_status: 200,
       artificial_delay_ms: 0,

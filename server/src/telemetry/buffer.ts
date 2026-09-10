@@ -9,6 +9,27 @@ interface AttemptRecord {
   timestamp: number;
 }
 
+/**
+ * Computes NIST-standard percentile using linear interpolation between closest ranks.
+ */
+export function calculateNistPercentile(sortedValues: number[], percentile: number): number {
+  const n = sortedValues.length;
+  if (n === 0) return 0;
+  if (n === 1) return sortedValues[0];
+
+  const rank = (percentile / 100) * (n - 1);
+  const lowerIndex = Math.floor(rank);
+  const upperIndex = Math.ceil(rank);
+  const weight = rank - lowerIndex;
+
+  if (lowerIndex === upperIndex) {
+    return sortedValues[lowerIndex];
+  }
+
+  const interpolated = sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight;
+  return Math.round(interpolated);
+}
+
 class TelemetryRingBuffer {
   private buffer: AttemptRecord[] = [];
   private flushTimer: NodeJS.Timeout | null = null;
@@ -60,9 +81,9 @@ class TelemetryRingBuffer {
 
     if (count > 0) {
       const latencies = recordsToProcess.map((r) => r.latencyMs).sort((a, b) => a - b);
-      p50 = latencies[Math.floor(count * 0.5)] || 0;
-      p95 = latencies[Math.floor(count * 0.95)] || latencies[count - 1] || 0;
-      p99 = latencies[Math.floor(count * 0.99)] || latencies[count - 1] || 0;
+      p50 = calculateNistPercentile(latencies, 50);
+      p95 = calculateNistPercentile(latencies, 95);
+      p99 = calculateNistPercentile(latencies, 99);
 
       delivered = recordsToProcess.filter((r) => r.status >= 200 && r.status < 300).length;
       failed = count - delivered;

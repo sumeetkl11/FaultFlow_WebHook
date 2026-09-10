@@ -119,6 +119,22 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
   const { audienceMode, optimisticReplay, addToast } = useTelemetryStore();
   const isBusiness = audienceMode === 'business';
 
+  // 4.4 Search Debounce (200ms) to avoid re-renders on each keystroke
+  const [localSearch, setLocalSearch] = React.useState(searchQuery);
+
+  React.useEffect(() => {
+    setLocalSearch(searchQuery);
+  }, [searchQuery]);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (localSearch !== searchQuery) {
+        onSearchQueryChange(localSearch);
+      }
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [localSearch, searchQuery, onSearchQueryChange]);
+
   const filteredEvents = events.filter((e) => {
     if (statusFilter && e.status !== statusFilter) return false;
     if (searchQuery) {
@@ -167,8 +183,8 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
             <input
               type="text"
               placeholder="Search…"
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
               className="pl-6 pr-2 py-1 bg-zinc-950 border border-zinc-800 rounded text-[11px] text-zinc-200 placeholder-zinc-600 font-mono focus:outline-none focus:border-zinc-600 w-36 transition-colors"
             />
           </div>
@@ -248,7 +264,6 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
                 {filteredEvents.map((evt, idx) => (
                   <motion.tr
                     key={evt.event_id}
-                    layout
                     variants={rowVariants}
                     initial="hidden"
                     animate="visible"

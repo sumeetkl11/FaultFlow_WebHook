@@ -267,14 +267,14 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
                           Job enqueued. Awaiting worker dispatch…
                         </div>
                       ) : (
-                        <div className="relative pl-5 space-y-3 before:absolute before:left-1.5 before:top-2 before:bottom-2 before:w-px before:bg-zinc-800">
+                        <div className="timeline-track space-y-3">
                           {details.attempts_timeline?.map((att, idx) => {
                             const isOk = att.response_status != null && att.response_status >= 200 && att.response_status < 300;
                             return (
                               <div key={idx} className="relative">
                                 {/* Timeline dot */}
                                 <div
-                                  className={`absolute -left-5 top-2 w-3 h-3 rounded-full border flex items-center justify-center ${
+                                  className={`timeline-node border ${
                                     isOk
                                       ? 'bg-emerald-950 border-emerald-700'
                                       : 'bg-rose-950 border-rose-700'

@@ -27,8 +27,9 @@ interface TelemetryState {
   audienceMode: AudienceMode;
   bannerCollapsed: boolean;
 
-  // Sliding ring-buffer for live events (max 50)
+  // Sliding ring-buffer for live events (max 50) and O(1) index lookup map
   events: EventItem[];
+  eventIndexMap: Record<string, number>;
 
   // Chaos logs feed
   chaosLogs: string[];
@@ -52,6 +53,14 @@ interface TelemetryState {
 }
 
 const MAX_RING_BUFFER_SIZE = 50;
+
+function buildIndexMap(items: EventItem[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  for (let i = 0; i < items.length; i++) {
+    map[items[i].event_id] = i;
+  }
+  return map;
+}
 
 // Helper to read initial audience mode from localStorage if available
 const getInitialAudienceMode = (): AudienceMode => {
@@ -79,6 +88,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   audienceMode: getInitialAudienceMode(),
   bannerCollapsed: false,
   events: [],
+  eventIndexMap: {},
   chaosLogs: [],
   toasts: [],
 
@@ -93,54 +103,82 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
 
   setSseConnected: (connected) => set({ sseConnected: connected }),
 
+  // 4.3 Atomic Telemetry Updates: synchronizes all metric streams into an atomic state snapshot
   updateTelemetry: (metrics) =>
-    set((state) => ({
-      throughputRps: metrics.throughput_rps ?? state.throughputRps,
-      p50Ms: metrics.latency_percentiles?.p50_ms ?? state.p50Ms,
-      p95Ms: metrics.latency_percentiles?.p95_ms ?? state.p95Ms,
-      p99Ms: metrics.latency_percentiles?.p99_ms ?? state.p99Ms,
-      activeQueue: metrics.queue_depth?.active ?? state.activeQueue,
-      delayedQueue: metrics.queue_depth?.delayed ?? state.delayedQueue,
-      dlqCount: metrics.queue_depth?.failed_dlq ?? state.dlqCount,
-      rescuedPayloads: metrics.rescued_payloads ?? state.rescuedPayloads,
-      deduplications: metrics.deduplications ?? state.deduplications,
-    })),
-
-  applyJobDelta: (delta) =>
     set((state) => {
-      const index = state.events.findIndex((e) => e.event_id === delta.event_id);
-      if (index === -1) {
-        // If not found in buffer, prepend it
-        const newEvent: EventItem = {
-          event_id: delta.event_id,
-          target_url: delta.target_url || 'https://unknown',
-          event_type: delta.event_type || 'unknown',
-          status: (delta.status as any) || 'QUEUED',
-          attempts: delta.attempts || 0,
-          latency_ms: delta.latency_ms ?? null,
-          last_http_status: delta.last_http_status ?? null,
-          created_at: new Date().toISOString(),
-          next_retry_in_ms: delta.next_retry_in_ms,
-        };
-        const updated = [newEvent, ...state.events.slice(0, MAX_RING_BUFFER_SIZE - 1)];
-        return { events: updated };
-      }
+      const nextThroughput = metrics.throughput_rps ?? state.throughputRps;
+      const nextP50 = metrics.latency_percentiles?.p50_ms ?? state.p50Ms;
+      const nextP95 = metrics.latency_percentiles?.p95_ms ?? state.p95Ms;
+      const nextP99 = metrics.latency_percentiles?.p99_ms ?? state.p99Ms;
+      const nextActive = metrics.queue_depth?.active ?? state.activeQueue;
+      const nextDelayed = metrics.queue_depth?.delayed ?? state.delayedQueue;
+      const nextDlq = metrics.queue_depth?.failed_dlq ?? state.dlqCount;
+      const nextRescued = metrics.rescued_payloads ?? state.rescuedPayloads;
+      const nextDedup = metrics.deduplications ?? state.deduplications;
 
-      const updated = [...state.events];
-      updated[index] = {
-        ...updated[index],
-        ...delta,
-        status: (delta.status || updated[index].status) as any,
+      return {
+        throughputRps: nextThroughput,
+        p50Ms: nextP50,
+        p95Ms: nextP95,
+        p99Ms: nextP99,
+        activeQueue: nextActive,
+        delayedQueue: nextDelayed,
+        dlqCount: nextDlq,
+        rescuedPayloads: nextRescued,
+        deduplications: nextDedup,
       };
-      return { events: updated };
     }),
 
-  setEvents: (events) => set({ events: events.slice(0, MAX_RING_BUFFER_SIZE) }),
+  // 2.3 O(1) Zustand Lookup: direct map index resolution instead of O(N) array findIndex scan
+  applyJobDelta: (delta) =>
+    set((state) => {
+      const existingIdx = state.eventIndexMap[delta.event_id];
+      if (existingIdx !== undefined && state.events[existingIdx]?.event_id === delta.event_id) {
+        const updatedEvents = [...state.events];
+        updatedEvents[existingIdx] = {
+          ...updatedEvents[existingIdx],
+          ...delta,
+          status: (delta.status || updatedEvents[existingIdx].status) as any,
+        };
+        return { events: updatedEvents };
+      }
+
+      // If not present in buffer, prepend new event
+      const newEvent: EventItem = {
+        event_id: delta.event_id,
+        target_url: delta.target_url || 'https://unknown',
+        event_type: delta.event_type || 'unknown',
+        status: (delta.status as any) || 'QUEUED',
+        attempts: delta.attempts || 0,
+        latency_ms: delta.latency_ms ?? null,
+        last_http_status: delta.last_http_status ?? null,
+        created_at: new Date().toISOString(),
+        next_retry_in_ms: delta.next_retry_in_ms,
+      };
+
+      const updated = [newEvent, ...state.events.slice(0, MAX_RING_BUFFER_SIZE - 1)];
+      return {
+        events: updated,
+        eventIndexMap: buildIndexMap(updated),
+      };
+    }),
+
+  setEvents: (events) => {
+    const trimmed = events.slice(0, MAX_RING_BUFFER_SIZE);
+    set({
+      events: trimmed,
+      eventIndexMap: buildIndexMap(trimmed),
+    });
+  },
 
   prependEvent: (event) =>
     set((state) => {
       const filtered = state.events.filter((e) => e.event_id !== event.event_id);
-      return { events: [event, ...filtered.slice(0, MAX_RING_BUFFER_SIZE - 1)] };
+      const updated = [event, ...filtered.slice(0, MAX_RING_BUFFER_SIZE - 1)];
+      return {
+        events: updated,
+        eventIndexMap: buildIndexMap(updated),
+      };
     }),
 
   addChaosLog: (log) =>
@@ -191,6 +229,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   rollbackEvents: (prevEvents, prevActiveQueue, prevDlqCount) =>
     set((state) => ({
       events: prevEvents,
+      eventIndexMap: buildIndexMap(prevEvents),
       activeQueue: prevActiveQueue !== undefined ? prevActiveQueue : state.activeQueue,
       dlqCount: prevDlqCount !== undefined ? prevDlqCount : state.dlqCount,
     })),

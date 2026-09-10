@@ -4,15 +4,23 @@ services:
     container_name: faultflow-postgres
     restart: always
     environment:
-      POSTGRES_USER: faultflow_admin
-      POSTGRES_PASSWORD: local_secret_password
-      POSTGRES_DB: faultflow_db
+      POSTGRES_USER: ${POSTGRES_USER:-faultflow_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_secret_password}
+      POSTGRES_DB: ${POSTGRES_DB:-faultflow_db}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+          memory: 1024M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U faultflow_admin -d faultflow_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-faultflow_admin} -d ${POSTGRES_DB:-faultflow_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -21,10 +29,19 @@ services:
     image: redis:7-alpine
     container_name: faultflow-redis
     restart: always
+    command: ["redis-server", "--maxmemory", "384mb", "--maxmemory-policy", "volatile-lru", "--save", "60", "1"]
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '1.00'
+          memory: 512M
+        reservations:
+          cpus: '0.20'
+          memory: 128M
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

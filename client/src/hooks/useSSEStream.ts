@@ -8,6 +8,12 @@ export function useSSEStream() {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectDelayRef = useRef(1000);
 
+  // Keep latest actions in a ref to eliminate stale closures without triggering reconnect cycles
+  const actionsRef = useRef({ updateTelemetry, applyJobDelta, setSseConnected, addChaosLog });
+  useEffect(() => {
+    actionsRef.current = { updateTelemetry, applyJobDelta, setSseConnected, addChaosLog };
+  }, [updateTelemetry, applyJobDelta, setSseConnected, addChaosLog]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -22,7 +28,7 @@ export function useSSEStream() {
 
       es.onopen = () => {
         if (!isMounted) return;
-        setSseConnected(true);
+        actionsRef.current.setSseConnected(true);
         reconnectDelayRef.current = 1000;
       };
 
@@ -30,7 +36,7 @@ export function useSSEStream() {
         if (!isMounted) return;
         try {
           const data = JSON.parse(e.data);
-          updateTelemetry(data);
+          actionsRef.current.updateTelemetry(data);
         } catch {
           // Ignore malformed message
         }
@@ -40,7 +46,7 @@ export function useSSEStream() {
         if (!isMounted) return;
         try {
           const data = JSON.parse(e.data);
-          applyJobDelta(data);
+          actionsRef.current.applyJobDelta(data);
         } catch {
           // Ignore malformed message
         }
@@ -50,7 +56,7 @@ export function useSSEStream() {
         if (!isMounted) return;
         try {
           const data = JSON.parse(e.data);
-          addChaosLog(`[ALERT] Job ${data.event_id} dead-lettered after ${data.attempts} attempts`);
+          actionsRef.current.addChaosLog(`[ALERT] Job ${data.event_id} dead-lettered after ${data.attempts} attempts`);
         } catch {
           // Ignore
         }
@@ -58,10 +64,10 @@ export function useSSEStream() {
 
       es.onerror = () => {
         if (!isMounted) return;
-        setSseConnected(false);
+        actionsRef.current.setSseConnected(false);
         es.close();
 
-        // Exponential reconnect (1s, 2s, 5s, 10s max)
+        // Exponential reconnect (1s, 2s, 4s, 8s, 10s max)
         const nextDelay = Math.min(reconnectDelayRef.current * 2, 10000);
         reconnectDelayRef.current = nextDelay;
 
@@ -82,5 +88,5 @@ export function useSSEStream() {
         clearTimeout(reconnectTimeoutRef.current);
       }
     };
-  }, [updateTelemetry, applyJobDelta, setSseConnected, addChaosLog]);
+  }, []);
 }

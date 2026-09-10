@@ -22,9 +22,12 @@ export const eventQueue = new Queue<WebhookJobData>('faultflow_events', {
       delay: 5000,
     },
     removeOnComplete: {
-      age: 3600, // Keep completed jobs for 1 hour
-      count: 1000,
+      age: 24 * 3600, // Keep completed jobs for 24 hours
+      count: 5000,    // Retain up to 5,000 completed jobs
     },
-    removeOnFail: false, // Retain failed jobs for DLQ inspection
+    removeOnFail: {
+      age: 7 * 24 * 3600, // Retain failed jobs in Redis for 7 days for DLQ inspection
+      count: 5000,        // Max 5,000 failed jobs to prevent Redis OOM
+    },
   },
 });

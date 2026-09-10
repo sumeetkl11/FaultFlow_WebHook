@@ -9,7 +9,8 @@ export async function rateLimiter(
   res: Response,
   next: NextFunction
 ) {
-  const tenantId = req.tenant?.id || req.ip || 'anonymous';
+  const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+  const tenantId = req.tenant?.id ? `tenant:${req.tenant.id}` : `ip:${clientIp}`;
   const currentMinute = Math.floor(Date.now() / (WINDOW_SIZE_SECONDS * 1000));
   const key = `ratelimit:${tenantId}:${currentMinute}`;
 

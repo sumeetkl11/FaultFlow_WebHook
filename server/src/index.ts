@@ -17,8 +17,23 @@ import './workers/deliveryWorker.js';
 
 const app = express();
 
+// Set reverse proxy trust count (SEC-03)
+app.set('trust proxy', config.trustedProxyCount);
+
 // Security & Parsing Middleware
-app.use(cors({ origin: '*' }));
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin || config.corsAllowedOrigins.includes('*') || config.corsAllowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'X-API-Key', 'Idempotency-Key', 'Authorization', 'X-FaultFlow-Event', 'X-Signature', 'X-Timestamp'],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '5mb' }));
 
 // Request logging

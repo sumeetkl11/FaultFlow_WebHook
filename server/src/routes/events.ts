@@ -7,6 +7,7 @@ import { IngestEventSchema } from '../schemas/eventSchema.js';
 import { telemetryBuffer } from '../telemetry/buffer.js';
 import { sseBroadcaster } from '../telemetry/sseBroadcaster.js';
 import { config } from '../config/env.js';
+import { generateWebhookSignature } from '../utils/signature.js';
 
 export const eventsRouter = Router();
 
@@ -20,6 +21,18 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
       error: {
         code: 'MISSING_IDEMPOTENCY_KEY',
         message: 'The Idempotency-Key header is required for all event dispatches.',
+        status: 400,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  const trimmedKey = idempotencyKey.trim();
+  if (trimmedKey.length === 0 || trimmedKey.length > 128 || !/^[A-Za-z0-9_.:-]+$/.test(trimmedKey)) {
+    return res.status(400).json({
+      error: {
+        code: 'INVALID_IDEMPOTENCY_KEY',
+        message: 'The Idempotency-Key header must be 1-128 alphanumeric, dash, dot, colon, or underscore characters.',
         status: 400,
         timestamp: new Date().toISOString(),
       },
@@ -73,23 +86,36 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
   }
 
   // Insert initial record in PostgreSQL events table
-  await db.query(
-    `INSERT INTO events 
-     (id, tenant_id, idempotency_key, target_url, event_type, status, max_retries, timeout_ms, payload_ref_id, inline_payload)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      eventId,
-      tenant.id,
-      idempotencyKey,
-      target_url,
-      event_type,
-      'QUEUED',
-      max_retries,
-      timeout_ms,
-      payloadRefId,
-      inlinePayload ? JSON.stringify(inlinePayload) : null,
-    ]
-  );
+  try {
+    await db.query(
+      `INSERT INTO events 
+       (id, tenant_id, idempotency_key, target_url, event_type, status, max_retries, timeout_ms, payload_ref_id, inline_payload)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        eventId,
+        tenant.id,
+        idempotencyKey,
+        target_url,
+        event_type,
+        'QUEUED',
+        max_retries,
+        timeout_ms,
+        payloadRefId,
+        inlinePayload ? JSON.stringify(inlinePayload) : null,
+      ]
+    );
+  } catch (dbErr: any) {
+    // PostgreSQL error code 23505: unique_violation (concurrent idempotency race condition)
+    if (dbErr.code === '23505') {
+      telemetryBuffer.recordDeduplication();
+      return res.status(200).json({
+        success: true,
+        status: 200,
+        message: 'Deduplicated: payload already received and queued for delivery.',
+      });
+    }
+    throw dbErr;
+  }
 
   // Push into BullMQ Queue (< 25ms total response time)
   await eventQueue.add(
@@ -222,12 +248,14 @@ eventsRouter.get('/:id', async (req: Request, res: Response) => {
     [id]
   );
 
-  // Compute HMAC preview
+  // Compute Stripe/Svix HMAC preview
   const payloadStr = JSON.stringify(payload || {});
-  const hmacSignature = crypto
-    .createHmac('sha256', row.signing_secret)
-    .update(payloadStr)
-    .digest('hex');
+  const previewTimestamp = Math.floor(new Date(row.created_at).getTime() / 1000) || Math.floor(Date.now() / 1000);
+  const { headerValue: hmacSignature } = generateWebhookSignature(
+    payloadStr,
+    previewTimestamp,
+    row.signing_secret
+  );
 
   return res.status(200).json({
     success: true,
