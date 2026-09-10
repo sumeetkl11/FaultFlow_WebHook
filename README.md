@@ -12,9 +12,7 @@
 
 ## 🎯 The Pitch (Recruiters & Reviewers)
 
-> *"Yeh ek fully functional prototype hai jo prove karta hai ki hum kaise modern e-commerce (Shopify/Stripe) aur third-party services ke beech transaction drops ko zero kar sakte hain. Hamara goal real-world load absorb karne ka proof-of-concept deliver karna tha, jise future mein team ke sath production-grade Shopify plugin ya reverse-proxy mein convert kiya ja sakta hai."*
->
-> *(English translation: "This is a fully functional prototype that proves how we can eliminate transaction drops between modern e-commerce (Shopify/Stripe) and third-party services. Our goal was to deliver a proof-of-concept for real-world load absorption, which can be converted into a production-grade Shopify plugin or reverse-proxy with a team in the future.")*
+> *"This is a fully functional prototype that proves how we can eliminate transaction drops between modern e-commerce platforms (Shopify/Stripe) and third-party services. Our goal was to deliver a proof-of-concept for real-world load absorption, which can be converted into a production-grade Shopify plugin or reverse-proxy with a team in the future."*
 
 | Layer | Status | What it proves |
 |-------|--------|----------------|
