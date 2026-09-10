@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'FaultFlow: Resilient Webhook Orchestration & Telemetry',
@@ -16,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-zinc-950 text-zinc-100 antialiased selection:bg-zinc-800 selection:text-zinc-100 font-sans">
-        <Providers>{children}</Providers>
+        {children}
       </body>
     </html>
   );

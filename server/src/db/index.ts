@@ -16,27 +16,12 @@ pool.on('error', (err) => {
   logger.warn({ err: err.message }, 'Notice: PostgreSQL idle connection dropped (pool will auto-reconnect)');
 });
 
-export const db = {
-  query: async (text: string, params?: any[]) => {
-    try {
-      return await pool.query(text, params);
-    } catch (err: any) {
-      if (err.message && (err.message.includes('Connection terminated') || err.message.includes('timeout'))) {
-        logger.warn('Retrying database query after connection drop...');
-        return await pool.query(text, params);
-      }
-      throw err;
-    }
-  },
-  getClient: () => pool.connect(),
-  checkHealth: async () => {
-    try {
-      const res = await pool.query('SELECT 1 as healthy');
-      return res.rows[0]?.healthy === 1;
-    } catch (err) {
-      logger.error({ err }, 'PostgreSQL health check failed');
-      return false;
-    }
-  },
-  close: () => pool.end(),
-};
+export async function checkHealth() {
+  try {
+    const res = await pool.query('SELECT 1 as healthy');
+    return res.rows[0]?.healthy === 1;
+  } catch (err) {
+    logger.error({ err }, 'PostgreSQL health check failed');
+    return false;
+  }
+}

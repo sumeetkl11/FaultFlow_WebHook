@@ -3,16 +3,9 @@ import { useTelemetryStore } from '../stores/useTelemetryStore';
 import { DEFAULT_API_KEY } from '../lib/api';
 
 export function useSSEStream() {
-  const { updateTelemetry, applyJobDelta, setSseConnected, addChaosLog } = useTelemetryStore();
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectDelayRef = useRef(1000);
-
-  // Keep latest actions in a ref to eliminate stale closures without triggering reconnect cycles
-  const actionsRef = useRef({ updateTelemetry, applyJobDelta, setSseConnected, addChaosLog });
-  useEffect(() => {
-    actionsRef.current = { updateTelemetry, applyJobDelta, setSseConnected, addChaosLog };
-  }, [updateTelemetry, applyJobDelta, setSseConnected, addChaosLog]);
 
   useEffect(() => {
     let isMounted = true;
@@ -28,43 +21,35 @@ export function useSSEStream() {
 
       es.onopen = () => {
         if (!isMounted) return;
-        actionsRef.current.setSseConnected(true);
+        useTelemetryStore.getState().setSseConnected(true);
         reconnectDelayRef.current = 1000;
       };
 
       es.addEventListener('telemetry_update', (e: MessageEvent) => {
         if (!isMounted) return;
         try {
-          const data = JSON.parse(e.data);
-          actionsRef.current.updateTelemetry(data);
-        } catch {
-          // Ignore malformed message
-        }
+          useTelemetryStore.getState().updateTelemetry(JSON.parse(e.data));
+        } catch {}
       });
 
       es.addEventListener('job_state_delta', (e: MessageEvent) => {
         if (!isMounted) return;
         try {
-          const data = JSON.parse(e.data);
-          actionsRef.current.applyJobDelta(data);
-        } catch {
-          // Ignore malformed message
-        }
+          useTelemetryStore.getState().applyJobDelta(JSON.parse(e.data));
+        } catch {}
       });
 
       es.addEventListener('dlq_alert', (e: MessageEvent) => {
         if (!isMounted) return;
         try {
           const data = JSON.parse(e.data);
-          actionsRef.current.addChaosLog(`[ALERT] Job ${data.event_id} dead-lettered after ${data.attempts} attempts`);
-        } catch {
-          // Ignore
-        }
+          useTelemetryStore.getState().addChaosLog(`[ALERT] Job ${data.event_id} dead-lettered after ${data.attempts} attempts`);
+        } catch {}
       });
 
       es.onerror = () => {
         if (!isMounted) return;
-        actionsRef.current.setSseConnected(false);
+        useTelemetryStore.getState().setSseConnected(false);
         es.close();
 
         // Exponential reconnect (1s, 2s, 4s, 8s, 10s max)

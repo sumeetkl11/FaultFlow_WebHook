@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db/index.js';
+import { pool } from '../db/index.js';
 import { replayDlqEvents } from '../queues/dlqReplay.js';
 import { DlqReplaySchema } from '../schemas/eventSchema.js';
 
@@ -42,7 +42,7 @@ dlqRouter.get('/', async (req: Request, res: Response) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit as string || '20', 10), 1), 100);
   const offset = Math.max(parseInt(req.query.offset as string || '0', 10), 0);
 
-  const result = await db.query(
+  const result = await pool.query(
     `SELECT d.id as dlq_id, d.event_id, d.error_message, d.retry_count, d.dead_lettered_at,
             e.target_url, e.event_type
      FROM dead_letter_queue d
@@ -53,7 +53,7 @@ dlqRouter.get('/', async (req: Request, res: Response) => {
     [tenant.id, limit, offset]
   );
 
-  const countRes = await db.query(
+  const countRes = await pool.query(
     `SELECT COUNT(*) as total FROM dead_letter_queue WHERE tenant_id = $1`,
     [tenant.id]
   );

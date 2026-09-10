@@ -1,8 +1,9 @@
-import { db } from '../db/index.js';
+import crypto from 'crypto';
+import { pool } from '../db/index.js';
 import { eventQueue } from './eventQueue.js';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/env.js';
-import { sseBroadcaster } from '../telemetry/sseBroadcaster.js';
+import * as sseBroadcaster from '../telemetry/sseBroadcaster.js';
 
 interface ReplayResult {
   replayedCount: number;
@@ -32,7 +33,7 @@ export async function replayDlqEvents(
 
   queryText += ` ORDER BY d.dead_lettered_at ASC LIMIT 500`;
 
-  const result = await db.query(queryText, queryParams);
+  const result = await pool.query(queryText, queryParams);
   const items = result.rows;
 
   if (items.length === 0) {
@@ -45,17 +46,14 @@ export async function replayDlqEvents(
 
   logger.info({ count: items.length, mode }, 'Starting throttled DLQ replay');
 
-  // Token-bucket rate throttle: 50 jobs / sec => 1 job every 20ms
-  const intervalMs = Math.max(1, Math.floor(1000 / config.dlqReplayMaxRps));
-
   let replayedCount = 0;
 
   for (const item of items) {
     // 1. Remove from DLQ table
-    await db.query(`DELETE FROM dead_letter_queue WHERE id = $1`, [item.dlq_id]);
+    await pool.query(`DELETE FROM dead_letter_queue WHERE id = $1`, [item.dlq_id]);
 
     // 2. Reset event status to QUEUED and attempts to 0
-    await db.query(
+    await pool.query(
       `UPDATE events SET status = 'QUEUED', attempts = 0, last_http_status = NULL WHERE id = $1`,
       [item.event_id]
     );
@@ -89,19 +87,14 @@ export async function replayDlqEvents(
     }, tenantId);
 
     replayedCount++;
-
-    // Throttle delay between items
-    if (intervalMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, intervalMs));
-    }
   }
 
   // Audit log entry
-  await db.query(
+  await pool.query(
     `INSERT INTO audit_logs (id, tenant_id, action, actor_id, details)
      VALUES ($1, $2, $3, $4, $5)`,
     [
-      `audit_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      `audit_${crypto.randomUUID()}`,
       tenantId,
       'DLQ_BATCH_REPLAY',
       'api_admin',

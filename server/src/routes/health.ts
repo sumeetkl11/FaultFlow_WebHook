@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db/index.js';
+import { pool, checkHealth } from '../db/index.js';
 import { checkRedisHealth } from '../redis/index.js';
 
 export const healthRouter = Router();
@@ -10,7 +10,7 @@ healthRouter.get('/liveness', (req: Request, res: Response) => {
 
 healthRouter.get('/readiness', async (req: Request, res: Response) => {
   const [dbHealthy, redisHealthy] = await Promise.all([
-    db.checkHealth(),
+    checkHealth(),
     checkRedisHealth(),
   ]);
 

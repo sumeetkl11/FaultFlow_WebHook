@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../lib/api';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
@@ -52,20 +51,27 @@ export default function DashboardPage() {
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false);
   const [isRoadmapOpen, setIsRoadmapOpen] = useState<boolean>(false);
 
-  // Fetch paginated events from REST endpoint
-  const {
-    data: eventsData,
-    refetch: refetchEvents,
-  } = useQuery({
-    queryKey: ['events', page, statusFilter, searchQuery],
-    queryFn: () =>
-      api.getEvents({
+  const [eventsData, setEventsData] = useState<any>(null);
+
+  const fetchEvents = useCallback(async () => {
+    try {
+      const data = await api.getEvents({
         limit: pageSize,
         offset: (page - 1) * pageSize,
         status: statusFilter || undefined,
         event_type: searchQuery || undefined,
-      }),
-  });
+      });
+      setEventsData(data);
+    } catch (err) {
+      console.error('Failed to fetch events:', err);
+    }
+  }, [page, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const refetchEvents = fetchEvents;
 
   // Synchronize REST events with live ring-buffer
   useEffect(() => {

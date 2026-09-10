@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { db } from '../db/index.js';
+import { pool } from '../db/index.js';
 import { logger } from '../utils/logger.js';
 
 export interface TenantInfo {
@@ -73,7 +73,7 @@ export async function authenticateTenant(
   }
 
   try {
-    const result = await db.query(
+    const result = await pool.query(
       `SELECT id, name, api_key_hash, signing_secret FROM tenants WHERE api_key_hash = $1 LIMIT 1`,
       [apiKeyHash]
     );

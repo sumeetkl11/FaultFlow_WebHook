@@ -62,16 +62,7 @@ function buildIndexMap(items: EventItem[]): Record<string, number> {
   return map;
 }
 
-// Helper to read initial audience mode from localStorage if available
-const getInitialAudienceMode = (): AudienceMode => {
-  if (typeof window !== 'undefined') {
-    const saved = localStorage.getItem('faultflow_audience_mode');
-    if (saved === 'engineering' || saved === 'business') {
-      return saved;
-    }
-  }
-  return 'business';
-};
+// Removed getInitialAudienceMode
 
 export const useTelemetryStore = create<TelemetryState>((set) => ({
   throughputRps: 0,
@@ -85,7 +76,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
   deduplications: 0,
   sseConnected: false,
 
-  audienceMode: getInitialAudienceMode(),
+  audienceMode: typeof window !== 'undefined' && localStorage.getItem('faultflow_audience_mode') === 'engineering' ? 'engineering' : 'business',
   bannerCollapsed: false,
   events: [],
   eventIndexMap: {},
@@ -187,7 +178,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
     })),
 
   addToast: (toast) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const id = crypto.randomUUID();
     set((state) => ({
       toasts: [...state.toasts, { ...toast, id }],
     }));

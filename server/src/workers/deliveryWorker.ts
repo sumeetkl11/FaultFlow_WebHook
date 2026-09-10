@@ -1,11 +1,11 @@
 import { Worker, Job } from 'bullmq';
 import crypto from 'crypto';
 import { redisConnection } from '../redis/index.js';
-import { db } from '../db/index.js';
+import { pool } from '../db/index.js';
 import { logger } from '../utils/logger.js';
-import { telemetryBuffer } from '../telemetry/buffer.js';
+import * as telemetryBuffer from '../telemetry/buffer.js';
 import { circuitBreaker } from './circuitBreaker.js';
-import { sseBroadcaster } from '../telemetry/sseBroadcaster.js';
+import * as sseBroadcaster from '../telemetry/sseBroadcaster.js';
 import { WebhookJobData } from '../queues/eventQueue.js';
 import { config } from '../config/env.js';
 import { validateWebhookUrl } from '../utils/urlValidator.js';
@@ -42,7 +42,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
     if (await circuitBreaker.isTripped(targetUrl)) {
       const remainingCooldown = await circuitBreaker.getRemainingCooldownMs(targetUrl);
       logger.warn({ targetUrl, remainingCooldown }, 'Circuit breaker is TRIPPED; delaying execution');
-      await db.query(
+      await pool.query(
         `UPDATE events SET status = 'CIRCUIT_HOLD' WHERE id = $1`,
         [eventId]
       );
@@ -58,7 +58,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
     // Resolve payload (inline or offloaded from PostgreSQL event_blobs)
     let resolvedPayload = payload;
     if (!resolvedPayload && payloadRefId) {
-      const blobRes = await db.query('SELECT body FROM event_blobs WHERE id = $1', [payloadRefId]);
+      const blobRes = await pool.query('SELECT body FROM event_blobs WHERE id = $1', [payloadRefId]);
       if (blobRes.rowCount && blobRes.rows[0].body) {
         resolvedPayload = JSON.parse(blobRes.rows[0].body);
       }
@@ -72,20 +72,20 @@ export const deliveryWorker = new Worker<WebhookJobData>(
     } catch (ssrfErr: any) {
       logger.error({ eventId, targetUrl, err: ssrfErr.message }, 'SSRF Validation blocked webhook delivery');
       const latencyMs = 0;
-      await db.query(
+      await pool.query(
         `INSERT INTO event_attempts (event_id, attempt_number, http_status, latency_ms, error_message)
          VALUES ($1, $2, $3, $4, $5)`,
         [eventId, attemptNumber, 400, latencyMs, ssrfErr.message]
       ).catch(() => {});
 
       const dlqId = `dlq_${eventId}_${Date.now()}`;
-      await db.query(
+      await pool.query(
         `INSERT INTO dead_letter_queue (id, event_id, tenant_id, error_message, last_response_body, retry_count)
          VALUES ($1, $2, $3, $4, $5, $6)`,
         [dlqId, eventId, tenantId, ssrfErr.message, 'BLOCKED_BY_SSRF_POLICY', attemptNumber]
       ).catch(() => {});
 
-      await db.query(
+      await pool.query(
         `UPDATE events SET status = 'DEAD_LETTERED', last_http_status = 400, attempts = $1 WHERE id = $2`,
         [attemptNumber, eventId]
       ).catch(() => {});
@@ -121,7 +121,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
 
     try {
       // Mark as PROCESSING
-      await db.query(`UPDATE events SET status = 'PROCESSING' WHERE id = $1`, [eventId]);
+      await pool.query(`UPDATE events SET status = 'PROCESSING' WHERE id = $1`, [eventId]);
       sseBroadcaster.broadcast('job_state_delta', {
         event_id: eventId,
         status: 'PROCESSING',
@@ -153,7 +153,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       }
 
       // Record in event_attempts table
-      await db.query(
+      await pool.query(
         `INSERT INTO event_attempts (event_id, attempt_number, http_status, latency_ms, error_message)
          VALUES ($1, $2, $3, $4, $5)`,
         [eventId, attemptNumber, responseStatus, latencyMs, null]
@@ -164,7 +164,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       if (response.ok) {
         // Success (2xx)
         await circuitBreaker.recordSuccess(targetUrl);
-        await db.query(
+        await pool.query(
           `UPDATE events 
            SET status = 'DELIVERED', latency_ms = $1, last_http_status = $2, attempts = $3, delivered_at = NOW()
            WHERE id = $4`,
@@ -198,7 +198,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       telemetryBuffer.recordAttempt(latencyMs, responseStatus || 504);
 
       // Record failure attempt in event_attempts
-      await db.query(
+      await pool.query(
         `INSERT INTO event_attempts (event_id, attempt_number, http_status, latency_ms, error_message)
          VALUES ($1, $2, $3, $4, $5)`,
         [eventId, attemptNumber, responseStatus || (isTimeout ? 504 : 500), latencyMs, errMsg]
@@ -209,13 +209,13 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       if (isExhausted) {
         // Route to Dead-Letter Queue (DLQ)
         const dlqId = `dlq_${eventId}_${Date.now()}`;
-        await db.query(
+        await pool.query(
           `INSERT INTO dead_letter_queue (id, event_id, tenant_id, error_message, last_response_body, retry_count)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [dlqId, eventId, tenantId, errMsg, responseBody.slice(0, 2000), attemptNumber]
         ).catch(() => {});
 
-        await db.query(
+        await pool.query(
           `UPDATE events 
            SET status = 'DEAD_LETTERED', last_http_status = $1, attempts = $2
            WHERE id = $3`,
@@ -241,7 +241,7 @@ export const deliveryWorker = new Worker<WebhookJobData>(
       } else {
         // Schedule next retry with exponential backoff & jitter
         const nextDelayMs = calculateBackoffWithJitter(attemptNumber);
-        await db.query(
+        await pool.query(
           `UPDATE events 
            SET status = 'RETRYING', attempts = $1, last_http_status = $2
            WHERE id = $3`,

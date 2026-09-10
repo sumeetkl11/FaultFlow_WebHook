@@ -1,11 +1,11 @@
 import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
-import { db } from '../db/index.js';
+import { pool } from '../db/index.js';
 import { checkAndSetIdempotency } from '../redis/index.js';
 import { eventQueue } from '../queues/eventQueue.js';
 import { IngestEventSchema } from '../schemas/eventSchema.js';
-import { telemetryBuffer } from '../telemetry/buffer.js';
-import { sseBroadcaster } from '../telemetry/sseBroadcaster.js';
+import * as telemetryBuffer from '../telemetry/buffer.js';
+import * as sseBroadcaster from '../telemetry/sseBroadcaster.js';
 import { config } from '../config/env.js';
 import { generateWebhookSignature } from '../utils/signature.js';
 
@@ -78,7 +78,7 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
 
   if (payloadBytes > config.maxPayloadInlineBytes) {
     payloadRefId = `blob_${eventId}`;
-    await db.query(
+    await pool.query(
       `INSERT INTO event_blobs (id, body) VALUES ($1, $2)`,
       [payloadRefId, payloadString]
     );
@@ -87,7 +87,7 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
 
   // Insert initial record in PostgreSQL events table
   try {
-    await db.query(
+    await pool.query(
       `INSERT INTO events 
        (id, tenant_id, idempotency_key, target_url, event_type, status, max_retries, timeout_ms, payload_ref_id, inline_payload)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -190,10 +190,10 @@ eventsRouter.get('/', async (req: Request, res: Response) => {
   query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
-  const result = await db.query(query, params);
+  const result = await pool.query(query, params);
 
   // Total count for pagination
-  const countResult = await db.query(
+  const countResult = await pool.query(
     `SELECT COUNT(*) as total FROM events WHERE tenant_id = $1`,
     [tenant.id]
   );
@@ -216,7 +216,7 @@ eventsRouter.get('/:id', async (req: Request, res: Response) => {
   const tenant = req.tenant!;
   const { id } = req.params;
 
-  const eventRes = await db.query(
+  const eventRes = await pool.query(
     `SELECT e.*, b.body as blob_body, t.signing_secret
      FROM events e
      LEFT JOIN event_blobs b ON e.payload_ref_id = b.id
@@ -240,7 +240,7 @@ eventsRouter.get('/:id', async (req: Request, res: Response) => {
   const payload = row.blob_body ? JSON.parse(row.blob_body) : row.inline_payload;
 
   // Retrieve attempt timeline
-  const attemptsRes = await db.query(
+  const attemptsRes = await pool.query(
     `SELECT attempt_number, http_status as response_status, latency_ms, error_message, attempted_at as timestamp
      FROM event_attempts
      WHERE event_id = $1

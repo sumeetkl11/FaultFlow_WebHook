@@ -6,17 +6,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const candidateEnvFiles = [
-  path.resolve(process.cwd(), '.env'),
-  path.resolve(process.cwd(), 'server', '.env'),
-  path.resolve(__dirname, '../../.env'),
-  path.resolve(process.cwd(), '.env.local'),
-];
-
-for (const envFile of candidateEnvFiles) {
-  if (fs.existsSync(envFile)) {
-    dotenv.config({ path: envFile });
-  }
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+if (fs.existsSync(path.resolve(process.cwd(), '.env.local'))) {
+  dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';

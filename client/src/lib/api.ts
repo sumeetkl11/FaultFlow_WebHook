@@ -32,11 +32,11 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
 
 export const api = {
   async getEvents(params: { limit?: number; offset?: number; status?: string; event_type?: string } = {}) {
-    const query = new URLSearchParams();
-    if (params.limit) query.set('limit', String(params.limit));
-    if (params.offset) query.set('offset', String(params.offset));
-    if (params.status) query.set('status', params.status);
-    if (params.event_type) query.set('event_type', params.event_type);
+    const query = new URLSearchParams(
+      Object.entries(params)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => [k, String(v)])
+    );
 
     return fetchWithAuth<{
       success: boolean;
@@ -102,9 +102,7 @@ export const api = {
     timeout_ms?: number;
     idempotency_key?: string;
   }) {
-    const idempotencyKey =
-      data.idempotency_key ||
-      `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const idempotencyKey = data.idempotency_key || crypto.randomUUID();
 
     return fetchWithAuth<{
       success: boolean;

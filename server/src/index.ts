@@ -67,19 +67,13 @@ const server = app.listen(config.port, () => {
 });
 
 // Graceful Shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    logger.info('HTTP server closed.');
-    process.exit(0);
-  });
-});
-
-process.on('SIGINT', () => {
-  logger.info('SIGINT received. Shutting down gracefully...');
-  server.close(() => {
-    logger.info('HTTP server closed.');
-    process.exit(0);
+['SIGTERM', 'SIGINT'].forEach(sig => {
+  process.on(sig, () => {
+    logger.info(`${sig} received. Shutting down gracefully...`);
+    server.close(() => {
+      logger.info('HTTP server closed.');
+      process.exit(0);
+    });
   });
 });
 
