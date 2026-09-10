@@ -23,7 +23,7 @@ function StatusBadge({ status, attempts, maxRetries, latencyMs, onReplay }: {
   latencyMs?: number | null;
   onReplay?: () => void;
 }) {
-  const { audienceMode } = useTelemetryStore();
+  const audienceMode = useTelemetryStore((s) => s.audienceMode);
   const isBusiness = audienceMode === 'business';
 
   const map: Record<string, string> = {
@@ -35,17 +35,23 @@ function StatusBadge({ status, attempts, maxRetries, latencyMs, onReplay }: {
     CIRCUIT_HOLD: 'badge badge-circuit',
   };
 
+  const deliveredLabel = isBusiness
+    ? 'Delivered'
+    : latencyMs !== null && latencyMs !== undefined
+    ? `DELIVERED · ${latencyMs}ms`
+    : 'DELIVERED';
+
   const labelMap: Record<string, string> = {
     QUEUED:       isBusiness ? 'Queued' : 'QUEUED',
     PROCESSING:   isBusiness ? 'Sending…' : 'PROCESSING',
     RETRYING:     isBusiness ? `Auto-Retry (${attempts}/${maxRetries})` : `RETRY ${attempts}/${maxRetries}`,
-    DELIVERED:    isBusiness ? 'Delivered' : `DELIVERED${latencyMs != null ? ` · ${latencyMs}ms` : ''}`,
+    DELIVERED:    deliveredLabel,
     DEAD_LETTERED:isBusiness ? 'Action Needed' : 'DLQ',
     CIRCUIT_HOLD: isBusiness ? 'Paused' : 'CIRCUIT_HOLD',
   };
 
-  const cls   = map[status] ?? 'badge bg-zinc-800 text-zinc-400 border-zinc-700';
-  const label = labelMap[status] ?? status;
+  const cls   = Object.prototype.hasOwnProperty.call(map, status) ? map[status] : 'badge bg-zinc-800 text-zinc-400 border-zinc-700';
+  const label = Object.prototype.hasOwnProperty.call(labelMap, status) ? labelMap[status] : status;
 
   return (
     <span className={`${cls} transition-colors duration-150 ease-in-out`}>
@@ -82,8 +88,8 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 
 /* ── Row enter animation config ─────────────────────────────────────────── */
 const rowVariants: Variants = {
-  hidden:  { opacity: 0, y: -10 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: 'easeOut' as const } },
+  hidden:  { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.2, ease: 'easeOut' as const } },
   exit:    { opacity: 0, transition: { duration: 0.1 } },
 };
 
@@ -116,7 +122,9 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
   searchQuery,
   onSearchQueryChange,
 }) => {
-  const { audienceMode, optimisticReplay, addToast } = useTelemetryStore();
+  const audienceMode = useTelemetryStore((s) => s.audienceMode);
+  const optimisticReplay = useTelemetryStore((s) => s.optimisticReplay);
+  const addToast = useTelemetryStore((s) => s.addToast);
   const isBusiness = audienceMode === 'business';
 
   // 4.4 Search Debounce (200ms) to avoid re-renders on each keystroke
@@ -269,7 +277,6 @@ export const EventStreamTable: React.FC<EventStreamTableProps> = ({
                     animate="visible"
                     exit="exit"
                     onClick={() => onSelectEvent(evt.event_id)}
-                    whileTap={{ scale: 0.995 }}
                     className="event-row border-b border-zinc-800/40 cursor-pointer group text-[13px]"
                   >
                     {/* Row # */}

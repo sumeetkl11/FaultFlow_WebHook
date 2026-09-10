@@ -12,6 +12,8 @@ export const pool = new Pool({
   keepAlive: true,
 });
 
+export const db = pool;
+
 pool.on('error', (err) => {
   logger.warn({ err: err.message }, 'Notice: PostgreSQL idle connection dropped (pool will auto-reconnect)');
 });

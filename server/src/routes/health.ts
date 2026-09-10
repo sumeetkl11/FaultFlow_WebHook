@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { pool, checkHealth } from '../db/index.js';
+import { checkHealth } from '../db/index.js';
 import { checkRedisHealth } from '../redis/index.js';
 
 export const healthRouter = Router();

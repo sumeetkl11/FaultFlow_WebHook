@@ -9,11 +9,9 @@ export interface TenantInfo {
   signingSecret: string;
 }
 
-declare global {
-  namespace Express {
-    interface Request {
-      tenant?: TenantInfo;
-    }
+declare module 'express-serve-static-core' {
+  interface Request {
+    tenant?: TenantInfo;
   }
 }
 
@@ -114,7 +112,7 @@ export async function authenticateTenant(
     setTenantCache(apiKeyHash, tenant);
     req.tenant = tenant;
     next();
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err }, 'Error during tenant authentication');
     return res.status(500).json({
       error: {

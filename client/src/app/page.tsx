@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../lib/api';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
+import type { EventItem } from '../types';
 import { useSSEStream } from '../hooks/useSSEStream';
 
 import { TopMetricBar } from '../components/TopMetricBar';
@@ -21,7 +22,6 @@ import {
   Zap,
   RotateCw,
   Send,
-  Radio,
   Briefcase,
   Code2,
   Map,
@@ -51,7 +51,10 @@ export default function DashboardPage() {
   const [isDispatchModalOpen, setIsDispatchModalOpen] = useState<boolean>(false);
   const [isRoadmapOpen, setIsRoadmapOpen] = useState<boolean>(false);
 
-  const [eventsData, setEventsData] = useState<any>(null);
+  const [eventsData, setEventsData] = useState<{
+    data: EventItem[];
+    meta: { total_count: number; limit: number; offset: number };
+  } | null>(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -62,8 +65,8 @@ export default function DashboardPage() {
         event_type: searchQuery || undefined,
       });
       setEventsData(data);
-    } catch (err) {
-      console.error('Failed to fetch events:', err);
+    } catch {
+      // Fetch failure handled silently; UI retains stale data
     }
   }, [page, statusFilter, searchQuery]);
 
@@ -91,8 +94,8 @@ export default function DashboardPage() {
       await api.replayDlq('SELECTIVE', [eventId]);
       addChaosLog(`[DLQ] Replay queued for ${eventId.slice(0, 8)}`);
       refetchEvents();
-    } catch (err: any) {
-      addChaosLog(`[ERROR] Replay failed: ${err.message}`);
+    } catch (err: unknown) {
+      addChaosLog(`[ERROR] Replay failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { redisClient } from '../redis/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -30,9 +31,9 @@ export const circuitBreaker = {
     try {
       const exists = await redisClient.exists(tripKey);
       return exists === 1;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Graceful fallback to local in-memory record
-      logger.warn({ host, err: err.message }, 'Redis circuit breaker check failed, using fallback');
+      logger.warn({ host, err: err instanceof Error ? err.message : String(err) }, 'Redis circuit breaker check failed, using fallback');
       const rec = fallbackFailureMap.get(host);
       return Boolean(rec?.trippedUntil && rec.trippedUntil > Date.now());
     }
@@ -48,8 +49,8 @@ export const circuitBreaker = {
 
     try {
       await redisClient.del(tripKey, failKey);
-    } catch (err: any) {
-      logger.warn({ host, err: err.message }, 'Failed to clear circuit breaker in Redis');
+    } catch (err: unknown) {
+      logger.warn({ host, err: err instanceof Error ? err.message : String(err) }, 'Failed to clear circuit breaker in Redis');
     }
 
     fallbackFailureMap.delete(host);
@@ -66,7 +67,8 @@ export const circuitBreaker = {
     const windowStart = now - FAILURE_WINDOW_MS;
 
     try {
-      const member = `${now}:${Math.random().toString(36).substring(2, 7)}`;
+      const randomBytes = Buffer.from(crypto.getRandomValues(new Uint8Array(4))).toString('hex');
+      const member = `${now}:${randomBytes}`;
       // Atomic pipeline: clean window, add failure, count failures, refresh TTL
       const results = await redisClient
         .multi()
@@ -87,9 +89,9 @@ export const circuitBreaker = {
       }
 
       return false;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Fallback in-memory tracking
-      logger.warn({ host, err: err.message }, 'Redis circuit breaker record failed, using fallback');
+      logger.warn({ host, err: err instanceof Error ? err.message : String(err) }, 'Redis circuit breaker record failed, using fallback');
       let rec = fallbackFailureMap.get(host);
       if (!rec) {
         rec = { failures: [], trippedUntil: null };
@@ -118,7 +120,7 @@ export const circuitBreaker = {
       return Math.max(0, pttl);
     } catch {
       const rec = fallbackFailureMap.get(host);
-      if (!rec || !rec.trippedUntil) return 0;
+      if (!rec?.trippedUntil) return 0;
       return Math.max(0, rec.trippedUntil - Date.now());
     }
   },

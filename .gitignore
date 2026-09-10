@@ -65,3 +65,9 @@ tmp/
 *dev.ps1
 *dev.sh
 *dev.bat
+
+# Local Agent & Workspace Skills
+.agents/
+
+# Unwanted / Personal Documents
+docs/extra/

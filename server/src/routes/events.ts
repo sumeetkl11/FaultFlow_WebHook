@@ -68,13 +68,13 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
   }
 
   const { target_url, event_type, payload, max_retries, timeout_ms } = parsed.data;
-  const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const eventId = `evt_${crypto.randomUUID().replace(/-/g, '').substring(0, 16)}`;
   const payloadString = JSON.stringify(payload);
   const payloadBytes = Buffer.byteLength(payloadString, 'utf8');
 
   // Hybrid Storage: Offload payloads > 4KB to PostgreSQL event_blobs
   let payloadRefId: string | null = null;
-  let inlinePayload: Record<string, any> | null = payload;
+  let inlinePayload: Record<string, unknown> | null = payload;
 
   if (payloadBytes > config.maxPayloadInlineBytes) {
     payloadRefId = `blob_${eventId}`;
@@ -104,9 +104,9 @@ eventsRouter.post('/', async (req: Request, res: Response) => {
         inlinePayload ? JSON.stringify(inlinePayload) : null,
       ]
     );
-  } catch (dbErr: any) {
+  } catch (dbErr: unknown) {
     // PostgreSQL error code 23505: unique_violation (concurrent idempotency race condition)
-    if (dbErr.code === '23505') {
+    if ((dbErr as { code?: string }).code === '23505') {
       telemetryBuffer.recordDeduplication();
       return res.status(200).json({
         success: true,
@@ -176,7 +176,7 @@ eventsRouter.get('/', async (req: Request, res: Response) => {
     FROM events
     WHERE tenant_id = $1
   `;
-  const params: any[] = [tenant.id];
+  const params: (string | number)[] = [tenant.id];
 
   if (status) {
     params.push(status);

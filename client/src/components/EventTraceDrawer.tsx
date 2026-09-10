@@ -34,7 +34,7 @@ function DrawerStatusBadge({ status }: { status: string }) {
     CIRCUIT_HOLD:  'badge badge-circuit',
   };
   return (
-    <span className={`${map[status] ?? 'badge bg-zinc-800 border-zinc-700 text-zinc-400'} transition-colors duration-150`}>
+    <span className={`${Object.prototype.hasOwnProperty.call(map, status) ? map[status] : 'badge bg-zinc-800 border-zinc-700 text-zinc-400'} transition-colors duration-150`}>
       {status}
     </span>
   );
@@ -97,7 +97,9 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
   const [copied, setCopied]     = useState<boolean>(false);
   const [replaying, setReplaying] = useState<boolean>(false);
 
-  const { audienceMode, optimisticReplay, addToast } = useTelemetryStore();
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
+  const optimisticReplay = useTelemetryStore(s => s.optimisticReplay);
+  const addToast = useTelemetryStore(s => s.addToast);
   const isBusiness = audienceMode === 'business';
 
   useEffect(() => {
@@ -106,7 +108,7 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
     setActiveTab('timeline');
     api.getEventTrace(eventId)
       .then((res) => { if (res?.data) setDetails(res.data); })
-      .catch((err) => { console.error('Failed to fetch trace:', err); })
+      .catch(() => {}) // trace fetch failures show 'No trace data found' state
       .finally(() => setLoading(false));
   }, [eventId]);
 
@@ -136,15 +138,14 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
         message: 'Submitted for immediate delivery attempt.',
       });
       if (onReplay) onReplay(eventId);
-    } catch (err: any) {
-      addToast({ type: 'error', title: 'Replay Failed', message: err.message || 'Unable to schedule replay.' });
+    } catch (err: unknown) {
+      addToast({ type: 'error', title: 'Replay Failed', message: err instanceof Error ? err.message : 'Unable to schedule replay.' });
     } finally {
       setReplaying(false);
     }
   };
 
   const isDeadLettered = details?.status === 'DEAD_LETTERED';
-  const isDelivered    = details?.status === 'DELIVERED';
 
   return (
     <AnimatePresence>
@@ -269,7 +270,7 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
                       ) : (
                         <div className="timeline-track space-y-3">
                           {details.attempts_timeline?.map((att, idx) => {
-                            const isOk = att.response_status != null && att.response_status >= 200 && att.response_status < 300;
+                            const isOk = att.response_status !== null && att.response_status !== undefined && att.response_status >= 200 && att.response_status < 300;
                             return (
                               <div key={idx} className="relative">
                                 {/* Timeline dot */}
@@ -305,7 +306,7 @@ export const EventTraceDrawer: React.FC<EventTraceDrawerProps> = ({
                                           : 'bg-rose-950/50 border-rose-800/50 text-rose-400'
                                       }`}
                                     >
-                                      {isOk ? 'HTTP 200 OK' : `HTTP ${att.response_status ?? 'TIMEOUT'}`}
+                                      {isOk ? 'HTTP 200 OK' : `HTTP ${att.response_status !== null && att.response_status !== undefined ? att.response_status : 'TIMEOUT'}`}
                                     </span>
                                     {att.latency_ms != null && (
                                       <span className="text-zinc-500 tabular-nums">

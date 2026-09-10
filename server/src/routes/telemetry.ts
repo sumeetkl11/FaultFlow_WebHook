@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import * as sseBroadcaster from '../telemetry/sseBroadcaster.js';
 import { pool } from '../db/index.js';
 
@@ -7,7 +8,7 @@ export const telemetryRouter = Router();
 // GET /api/v1/telemetry/stream - Real-Time Server-Sent Events (SSE) Stream
 telemetryRouter.get('/stream', (req: Request, res: Response) => {
   const tenant = req.tenant!;
-  const clientId = `sse_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const clientId = `sse_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');

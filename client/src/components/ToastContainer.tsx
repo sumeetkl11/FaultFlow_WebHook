@@ -6,7 +6,8 @@ import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ToastContainer: React.FC = () => {
-  const { toasts, removeToast } = useTelemetryStore();
+  const toasts = useTelemetryStore(s => s.toasts);
+  const removeToast = useTelemetryStore(s => s.removeToast);
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
@@ -16,13 +17,16 @@ export const ToastContainer: React.FC = () => {
           const isError = toast.type === 'error';
           const isWarning = toast.type === 'warning';
 
-          const borderClass = isSuccess
-            ? 'border-emerald-800/80 text-emerald-300'
-            : isError
-            ? 'border-rose-800/80 text-rose-300'
-            : isWarning
-            ? 'border-amber-800/80 text-amber-300'
-            : 'border-zinc-700 text-zinc-300';
+          let borderClass: string;
+          if (isSuccess) {
+            borderClass = 'border-emerald-800/80 text-emerald-300';
+          } else if (isError) {
+            borderClass = 'border-rose-800/80 text-rose-300';
+          } else if (isWarning) {
+            borderClass = 'border-amber-800/80 text-amber-300';
+          } else {
+            borderClass = 'border-zinc-700 text-zinc-300';
+          }
 
           return (
             <motion.div

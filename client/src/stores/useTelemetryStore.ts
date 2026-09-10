@@ -57,7 +57,8 @@ const MAX_RING_BUFFER_SIZE = 50;
 function buildIndexMap(items: EventItem[]): Record<string, number> {
   const map: Record<string, number> = {};
   for (let i = 0; i < items.length; i++) {
-    map[items[i].event_id] = i;
+    const item = items[i];
+    map[item.event_id] = i;
   }
   return map;
 }
@@ -129,7 +130,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
         updatedEvents[existingIdx] = {
           ...updatedEvents[existingIdx],
           ...delta,
-          status: (delta.status || updatedEvents[existingIdx].status) as any,
+          status: (delta.status ?? updatedEvents[existingIdx].status) as EventItem['status'],
         };
         return { events: updatedEvents };
       }
@@ -139,7 +140,7 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
         event_id: delta.event_id,
         target_url: delta.target_url || 'https://unknown',
         event_type: delta.event_type || 'unknown',
-        status: (delta.status as any) || 'QUEUED',
+        status: (delta.status as EventItem['status']) ?? 'QUEUED',
         attempts: delta.attempts || 0,
         latency_ms: delta.latency_ms ?? null,
         last_http_status: delta.last_http_status ?? null,
@@ -184,11 +185,12 @@ export const useTelemetryStore = create<TelemetryState>((set) => ({
     }));
 
     // Auto-dismiss after 4.5 seconds
-    setTimeout(() => {
+    function autoDismiss() {
       set((state) => ({
         toasts: state.toasts.filter((t) => t.id !== id),
       }));
-    }, 4500);
+    }
+    setTimeout(autoDismiss, 4500);
   },
 
   removeToast: (id) =>

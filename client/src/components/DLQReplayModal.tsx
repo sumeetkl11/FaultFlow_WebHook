@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DLQItem } from '../types';
 import { api } from '../lib/api';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
@@ -25,16 +25,14 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [replayResult, setReplayResult] = useState<string | null>(null);
 
-  const {
-    events,
-    activeQueue,
-    dlqCount,
-    optimisticReplay,
-    rollbackEvents,
-    addChaosLog,
-    addToast,
-    audienceMode,
-  } = useTelemetryStore();
+  const events = useTelemetryStore(s => s.events);
+  const activeQueue = useTelemetryStore(s => s.activeQueue);
+  const dlqCount = useTelemetryStore(s => s.dlqCount);
+  const optimisticReplay = useTelemetryStore(s => s.optimisticReplay);
+  const rollbackEvents = useTelemetryStore(s => s.rollbackEvents);
+  const addChaosLog = useTelemetryStore(s => s.addChaosLog);
+  const addToast = useTelemetryStore(s => s.addToast);
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
   const isBusiness = audienceMode === 'business';
 
   useEffect(() => {
@@ -48,7 +46,7 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
             setSelectedIds(res.data.map((i) => i.event_id));
           }
         })
-        .catch((err) => console.error('Failed to load DLQ items:', err))
+        .catch(() => {}) // DLQ load failures are non-fatal; show empty state
         .finally(() => setLoading(false));
     }
   }, [isOpen]);
@@ -116,13 +114,14 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
       setTimeout(() => {
         onClose();
       }, 1200);
-    } catch (err: any) {
+    } catch (err: unknown) {
       rollbackEvents(prevEvents, prevActive, prevDlq);
-      setReplayResult(`Error: ${err.message}`);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setReplayResult(`Error: ${errMsg}`);
       addToast({
         type: 'error',
         title: 'Replay Failed (Rolled Back)',
-        message: err.message || 'Previous state restored.',
+        message: errMsg || 'Previous state restored.',
       });
     } finally {
       setReplaying(false);
@@ -290,13 +289,11 @@ export const DLQReplayModal: React.FC<DLQReplayModalProps> = ({
                 className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[11px] flex items-center gap-1.5 border border-rose-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <RotateCw className={`w-3 h-3 ${replaying ? 'animate-spin' : ''}`} />
-                <span>
-                  {replaying
-                    ? 'Replaying…'
-                    : isBusiness
-                    ? 'Recover Orders'
-                    : 'Execute Replay'}
-                </span>
+                 <span>
+                   {replaying
+                     ? 'Replaying…'
+                     : isBusiness ? 'Recover Orders' : 'Execute Replay'}
+                 </span>
               </motion.button>
             </div>
           </div>

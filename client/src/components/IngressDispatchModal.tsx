@@ -65,13 +65,15 @@ export const IngressDispatchModal: React.FC<IngressDispatchModalProps> = ({
   const [maxRetries, setMaxRetries] = useState(5);
   const [timeoutMs, setTimeoutMs] = useState(5000);
   const [idempotencyKey, setIdempotencyKey] = useState(
-    `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+    `idemp_${Date.now()}_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, '0')).join('')}`
   );
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const { addChaosLog, addToast, audienceMode } = useTelemetryStore();
+  const addChaosLog = useTelemetryStore(s => s.addChaosLog);
+  const addToast = useTelemetryStore(s => s.addToast);
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
   const isBusiness = audienceMode === 'business';
 
   if (!isOpen) return null;
@@ -98,9 +100,9 @@ export const IngressDispatchModal: React.FC<IngressDispatchModalProps> = ({
 
     if (!validation.success) {
       const errors: Record<string, string> = {};
-      validation.error.issues.forEach((err: any) => {
-        if (err.path[0]) {
-          errors[err.path[0].toString()] = err.message;
+      validation.error.issues.forEach((issue) => {
+        if (issue.path[0]) {
+          errors[issue.path[0].toString()] = issue.message;
         }
       });
       setFieldErrors(errors);
@@ -108,7 +110,7 @@ export const IngressDispatchModal: React.FC<IngressDispatchModalProps> = ({
       return;
     }
 
-    let parsedPayload: any;
+    let parsedPayload: Record<string, unknown>;
     try {
       parsedPayload = JSON.parse(payloadJson);
     } catch {
@@ -144,10 +146,10 @@ export const IngressDispatchModal: React.FC<IngressDispatchModalProps> = ({
       onSuccess();
 
       setTimeout(() => {
-        setIdempotencyKey(`idemp_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`);
+        setIdempotencyKey(`idemp_${Date.now()}_${Array.from(crypto.getRandomValues(new Uint8Array(4))).map(b => b.toString(16).padStart(2, '0')).join('')}`);
       }, 1000);
-    } catch (err: any) {
-      setResult({ success: false, message: err.message || 'Failed to dispatch event' });
+    } catch (err: unknown) {
+      setResult({ success: false, message: err instanceof Error ? err.message : 'Failed to dispatch event' });
     } finally {
       setSubmitting(false);
     }

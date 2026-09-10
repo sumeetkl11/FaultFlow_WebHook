@@ -171,8 +171,8 @@ export async function validateWebhookUrl(
   } else {
     try {
       addresses = await dns.lookup(hostname, { all: true });
-    } catch (err: any) {
-      throw new SsrViolationError(`Failed to resolve DNS for hostname '${hostname}': ${err.message}`);
+    } catch (err: unknown) {
+      throw new SsrViolationError(`Failed to resolve DNS for hostname '${hostname}': ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

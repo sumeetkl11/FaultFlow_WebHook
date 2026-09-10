@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { redisClient } from '../redis/index.js';
+import { logger } from '../utils/logger.js';
 
 const WINDOW_SIZE_SECONDS = 60;
 const MAX_REQUESTS_PER_WINDOW = 2000;
@@ -35,8 +36,15 @@ export async function rateLimiter(
     res.setHeader('X-RateLimit-Limit', MAX_REQUESTS_PER_WINDOW);
     res.setHeader('X-RateLimit-Remaining', Math.max(0, MAX_REQUESTS_PER_WINDOW - currentCount));
     next();
-  } catch (err) {
-    // Graceful degradation: if Redis rate limiter fails, permit request
-    next();
+  } catch (err: unknown) {
+    logger.warn({ err }, 'Rate limiter Redis error; allowing request through');
+    return res.status(503).json({
+      error: {
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Rate limiting service is temporarily unavailable.',
+        status: 503,
+        timestamp: new Date().toISOString(),
+      },
+    });
   }
 }

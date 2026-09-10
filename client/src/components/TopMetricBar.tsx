@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useTelemetryStore } from '../stores/useTelemetryStore';
 import { RotateCw } from 'lucide-react';
 
@@ -74,17 +74,15 @@ function Divider() {
 }
 
 export const TopMetricBar: React.FC<TopMetricBarProps> = ({ onOpenDlqModal }) => {
-  const {
-    throughputRps,
-    p95Ms,
-    p50Ms,
-    rescuedPayloads,
-    deduplications,
-    dlqCount,
-    activeQueue,
-    audienceMode,
-    sseConnected,
-  } = useTelemetryStore();
+  const throughputRps = useTelemetryStore(s => s.throughputRps);
+  const p95Ms = useTelemetryStore(s => s.p95Ms);
+  const p50Ms = useTelemetryStore(s => s.p50Ms);
+  const rescuedPayloads = useTelemetryStore(s => s.rescuedPayloads);
+  const deduplications = useTelemetryStore(s => s.deduplications);
+  const dlqCount = useTelemetryStore(s => s.dlqCount);
+  const activeQueue = useTelemetryStore(s => s.activeQueue);
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
+  const sseConnected = useTelemetryStore(s => s.sseConnected);
 
   const isBusiness = audienceMode === 'business';
 
@@ -144,7 +142,7 @@ export const TopMetricBar: React.FC<TopMetricBarProps> = ({ onOpenDlqModal }) =>
 
       {/* Rescued Payloads */}
       <Metric
-        label={isBusiness ? 'Rescued' : 'Rescued'}
+        label="Rescued"
         value={<AnimatedNumber value={rescuedPayloads} />}
         unit={isBusiness ? 'orders' : 'payloads'}
         accent="text-emerald-400"

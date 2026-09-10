@@ -1,7 +1,8 @@
 import { EventItem, EventTraceDetails, ChaosConfig, DLQItem } from '../types';
 
 const API_BASE = '/api/v1';
-export const DEFAULT_API_KEY = 'org_live_sk_faultflow_test_key_2026';
+export const DEFAULT_API_KEY =
+  process.env.NEXT_PUBLIC_API_KEY || 'org_live_sk_faultflow_test_key_2026';
 
 async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers || {});
@@ -18,9 +19,9 @@ async function fetchWithAuth<T>(url: string, options: RequestInit = {}): Promise
   });
 
   if (!response.ok) {
-    let errorData: any;
+    let errorData: { error?: { message?: string }; message?: string };
     try {
-      errorData = await response.json();
+      errorData = await response.json() as { error?: { message?: string }; message?: string };
     } catch {
       errorData = { message: `Request failed with status ${response.status}` };
     }
@@ -34,7 +35,7 @@ export const api = {
   async getEvents(params: { limit?: number; offset?: number; status?: string; event_type?: string } = {}) {
     const query = new URLSearchParams(
       Object.entries(params)
-        .filter(([_, v]) => v !== undefined)
+        .filter(([, v]) => v !== undefined)
         .map(([k, v]) => [k, String(v)])
     );
 
@@ -90,14 +91,14 @@ export const api = {
   async getChaosLogs() {
     return fetchWithAuth<{
       success: boolean;
-      data: any[];
+      data: Record<string, unknown>[];
     }>(`${API_BASE}/chaos/logs`);
   },
 
   async ingestEvent(data: {
     target_url: string;
     event_type: string;
-    payload: Record<string, any>;
+    payload: Record<string, unknown>;
     max_retries?: number;
     timeout_ms?: number;
     idempotency_key?: string;

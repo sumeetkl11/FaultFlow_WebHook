@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { ChaosConfigSchema, ChaosConfigInput } from '../schemas/eventSchema.js';
 import { logger } from '../utils/logger.js';
 import { authenticateTenant } from '../middleware/auth.js';
@@ -22,8 +23,8 @@ interface ChaosLogEntry {
   method: string;
   status: number;
   delayMs: number;
-  headers: Record<string, any>;
-  body: any;
+  headers: Record<string, string>;
+  body: Record<string, unknown> | null;
 }
 
 const recentChaosLogs: ChaosLogEntry[] = [];
@@ -100,18 +101,18 @@ chaosRouter.all('/sink', async (req: Request, res: Response) => {
   const statusToReturn = shouldFail ? simulated_status : 200;
 
   const logEntry: ChaosLogEntry = {
-    id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+    id: `log_${crypto.randomUUID().replace(/-/g, '').substring(0, 12)}`,
     timestamp: new Date().toISOString(),
     method: req.method,
     status: statusToReturn,
     delayMs: artificial_delay_ms,
     headers: {
-      'x-signature': req.header('x-signature'),
-      'x-timestamp': req.header('x-timestamp'),
-      'x-faultflow-event': req.header('x-faultflow-event'),
-      'x-faultflow-delivery': req.header('x-faultflow-delivery'),
+      'x-signature': req.header('x-signature') ?? '',
+      'x-timestamp': req.header('x-timestamp') ?? '',
+      'x-faultflow-event': req.header('x-faultflow-event') ?? '',
+      'x-faultflow-delivery': req.header('x-faultflow-delivery') ?? '',
     },
-    body: req.body,
+    body: (req.body as Record<string, unknown>) ?? null,
   };
 
   recentChaosLogs.unshift(logEntry);

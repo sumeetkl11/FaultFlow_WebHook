@@ -12,10 +12,12 @@ import { chaosRouter } from './routes/chaos.js';
 import { telemetryRouter } from './routes/telemetry.js';
 import { healthRouter } from './routes/health.js';
 
-// Initialize background worker
-import './workers/deliveryWorker.js';
+// Worker is now decoupled and runs via worker.ts
 
 const app = express();
+
+// Disable X-Powered-By header to avoid disclosing server technology (SEC-04)
+app.disable('x-powered-by');
 
 // Set reverse proxy trust count (SEC-03)
 app.set('trust proxy', config.trustedProxyCount);

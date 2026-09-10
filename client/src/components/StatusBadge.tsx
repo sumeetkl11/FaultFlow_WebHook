@@ -22,7 +22,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   nextRetryInMs = 5000,
   onReplay,
 }) => {
-  const { audienceMode } = useTelemetryStore();
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
   const isBusiness = audienceMode === 'business';
 
   const [secondsRemaining, setSecondsRemaining] = useState<number>(
@@ -86,7 +86,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         <span className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded text-[11px] font-mono font-medium bg-emerald-950/40 text-emerald-400 border border-emerald-800/50 transition-colors duration-300 ease-in-out">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
           <span>{isBusiness ? 'Delivered' : 'DELIVERED'}</span>
-          {!isBusiness && latencyMs != null && (
+          {!isBusiness && latencyMs !== null && latencyMs !== undefined && (
             <span className="text-[10px] text-emerald-500 tabular-nums">
               · {latencyMs}ms
             </span>

@@ -28,7 +28,7 @@ function ToolbarButton({
   const baseClass =
     'inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-mono font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 
-  const variantClass = {
+  const variantClasses: Record<'default' | 'danger' | 'success' | 'warning', string> = {
     default: active
       ? 'bg-zinc-700 border-zinc-600 text-zinc-100'
       : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-600',
@@ -41,7 +41,8 @@ function ToolbarButton({
     warning: active
       ? 'bg-amber-950/80 border-amber-700 text-amber-300'
       : 'bg-zinc-900 border-zinc-700 text-amber-400/70 hover:bg-amber-950/60 hover:border-amber-800 hover:text-amber-300',
-  }[variant];
+  };
+  const variantClass = variantClasses[variant];
 
   return (
     <motion.button
@@ -65,7 +66,10 @@ export const ChaosControlPanel: React.FC = () => {
   });
   const [blastCount, setBlastCount] = useState<number>(25);
   const [isBlasting, setIsBlasting] = useState<boolean>(false);
-  const { chaosLogs, addChaosLog, addToast, audienceMode } = useTelemetryStore();
+  const chaosLogs = useTelemetryStore(s => s.chaosLogs);
+  const addChaosLog = useTelemetryStore(s => s.addChaosLog);
+  const addToast = useTelemetryStore(s => s.addToast);
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
   const isBusiness = audienceMode === 'business';
 
   useEffect(() => {
@@ -88,8 +92,8 @@ export const ChaosControlPanel: React.FC = () => {
           ? 'Incoming events will queue and retry automatically.'
           : 'Downstream server healthy. Events will deliver directly.',
       });
-    } catch (err: any) {
-      addChaosLog(`[ERROR] Config update failed: ${err.message}`);
+    } catch (err: unknown) {
+      addChaosLog(`[ERROR] Config update failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
@@ -103,7 +107,7 @@ export const ChaosControlPanel: React.FC = () => {
     });
 
     let sent = 0;
-    const promises: Promise<any>[] = [];
+    const promises: Promise<unknown>[] = [];
     for (let i = 0; i < count; i++) {
       promises.push(
         api.ingestEvent({

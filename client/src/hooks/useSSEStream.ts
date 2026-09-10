@@ -10,6 +10,14 @@ export function useSSEStream() {
   useEffect(() => {
     let isMounted = true;
 
+    function scheduleReconnect() {
+      const nextDelay = Math.min(reconnectDelayRef.current * 2, 10000);
+      reconnectDelayRef.current = nextDelay;
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (isMounted) connect();
+      }, nextDelay);
+    }
+
     function connect() {
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -51,14 +59,8 @@ export function useSSEStream() {
         if (!isMounted) return;
         useTelemetryStore.getState().setSseConnected(false);
         es.close();
-
         // Exponential reconnect (1s, 2s, 4s, 8s, 10s max)
-        const nextDelay = Math.min(reconnectDelayRef.current * 2, 10000);
-        reconnectDelayRef.current = nextDelay;
-
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (isMounted) connect();
-        }, nextDelay);
+        scheduleReconnect();
       };
     }
 

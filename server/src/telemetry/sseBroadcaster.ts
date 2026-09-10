@@ -22,7 +22,7 @@ export function addClient(id: string, tenantId: string, res: Response) {
   });
 }
 
-export function broadcast(eventType: string, data: any, tenantId?: string) {
+export function broadcast(eventType: string, data: Record<string, unknown>, tenantId?: string) {
   const payload = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
 
   for (const [id, client] of clients.entries()) {

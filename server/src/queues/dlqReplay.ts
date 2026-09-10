@@ -24,7 +24,7 @@ export async function replayDlqEvents(
     JOIN tenants t ON d.tenant_id = t.id
     WHERE d.tenant_id = $1
   `;
-  const queryParams: any[] = [tenantId];
+  const queryParams: (string | string[])[] = [tenantId];
 
   if (mode === 'SELECTIVE' && eventIds && eventIds.length > 0) {
     queryText += ` AND d.event_id = ANY($2::text[])`;

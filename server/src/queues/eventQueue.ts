@@ -6,7 +6,7 @@ export interface WebhookJobData {
   tenantId: string;
   targetUrl: string;
   eventType: string;
-  payload: Record<string, any> | null;
+  payload: Record<string, unknown> | null;
   payloadRefId: string | null;
   timeoutMs: number;
   maxRetries: number;

@@ -23,10 +23,12 @@ export function calculateNistPercentile(sortedValues: number[], percentile: numb
   const weight = rank - lowerIndex;
 
   if (lowerIndex === upperIndex) {
-    return sortedValues[lowerIndex];
+    return sortedValues[lowerIndex] ?? 0;
   }
 
-  const interpolated = sortedValues[lowerIndex] * (1 - weight) + sortedValues[upperIndex] * weight;
+  const lower = sortedValues[lowerIndex] ?? 0;
+  const upper = sortedValues[upperIndex] ?? 0;
+  const interpolated = lower * (1 - weight) + upper * weight;
   return Math.round(interpolated);
 }
 
@@ -109,8 +111,8 @@ async function flushMetrics() {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
       [now, throughputRps, p50, p95, p99, activeQueue, delayedQueue, dlqCount, delivered, failed]
     );
-  } catch (err: any) {
-    logger.warn({ err: err.message }, 'Failed persisting telemetry micro-batch');
+  } catch (err: unknown) {
+    logger.warn({ err: err instanceof Error ? err.message : String(err) }, 'Failed persisting telemetry micro-batch');
   }
 
   // Broadcast update over SSE stream

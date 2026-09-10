@@ -6,7 +6,9 @@ import { Zap, X, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export const ExplainerBanner: React.FC = () => {
-  const { audienceMode, bannerCollapsed, toggleBanner } = useTelemetryStore();
+  const audienceMode = useTelemetryStore(s => s.audienceMode);
+  const bannerCollapsed = useTelemetryStore(s => s.bannerCollapsed);
+  const toggleBanner = useTelemetryStore(s => s.toggleBanner);
   const isBusiness = audienceMode === 'business';
 
   if (bannerCollapsed) return null;
